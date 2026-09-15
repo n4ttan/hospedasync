@@ -1,0 +1,26 @@
+services:
+  worker-node:
+    build:
+      context: ./workers
+    container_name: hospeda_worker
+    ports:
+      - "8001:8001"
+    networks:
+      - hospeda-net
+
+  api-gateway:
+    build:
+      context: ./api-gateway
+    container_name: hospeda_gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - WORKER_SERVICE_URL=http://worker-node:8001
+    depends_on:
+      - worker-node
+    networks:
+      - hospeda-net
+
+networks:
+  hospeda-net:
+    driver: bridge
