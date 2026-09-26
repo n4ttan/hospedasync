@@ -3,50 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HospedaSync | Rate Intelligence</title>
+    <title>HospedaSync | Enterprise Rate Intelligence</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
-        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+        body { font-family: 'Inter', sans-serif; }
         .font-mono { font-family: 'JetBrains Mono', monospace; }
     </style>
 </head>
-<body class="bg-[#09090b] text-zinc-100 min-h-screen flex flex-col antialiased selection:bg-indigo-500/30 selection:text-indigo-200">
+<body class="bg-[#161b22] text-[#c9d1d9] min-h-screen flex flex-col antialiased selection:bg-[#1f6feb]/30 selection:text-[#58a6ff]">
 
     <!-- Top Navigation -->
-    <header class="border-b border-zinc-800/80 bg-[#09090b]/80 backdrop-blur sticky top-0 z-50">
+    <header class="border-b border-[#30363d] bg-[#0d1117]/90 backdrop-blur sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-            <div class="flex items-center space-x-3.5">
-                <div class="h-9 w-9 bg-indigo-600/10 border border-indigo-500/20 rounded-xl flex items-center justify-center text-indigo-400 font-bold text-lg shadow-inner">
-                    🏨
-                </div>
-                <div>
-                    <div class="flex items-center gap-2">
-                        <span class="text-base font-semibold tracking-tight text-white">HospedaSync</span>
-                        <span class="text-[10px] bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 px-2 py-0.5 rounded-full font-mono font-medium">Enterprise v1.2</span>
-                    </div>
-                    <p class="text-xs text-zinc-400">Inteligência Tarifária Distribuída em Nuvem</p>
-                </div>
+            <div>
+                <h1 class="text-base font-bold text-white tracking-tight">HospedaSync</h1>
+                <p class="text-xs text-[#8b949e]">Inteligência Tarifária Distribuída em Nuvem</p>
             </div>
 
             <div class="flex items-center space-x-6">
-                <div class="hidden md:flex items-center space-x-5 text-xs text-zinc-400 border-r border-zinc-800/80 pr-6">
+                <div class="hidden md:flex items-center space-x-5 text-xs text-[#8b949e] border-r border-[#30363d] pr-6">
                     <div>
-                        <span class="text-zinc-500 block">Região</span>
-                        <span class="text-zinc-200 font-medium">Poços de Caldas, BR</span>
+                        <span class="text-[#6e7681] block">Região</span>
+                        <span class="text-[#c9d1d9] font-medium">Poços de Caldas, BR</span>
                     </div>
                     <div>
-                        <span class="text-zinc-500 block">Orquestração</span>
-                        <span class="text-zinc-200 font-medium">Docker Cluster</span>
+                        <span class="text-[#6e7681] block">Orquestração</span>
+                        <span class="text-[#c9d1d9] font-medium">Docker Cluster</span>
                     </div>
                 </div>
 
-                <div class="flex items-center gap-2 bg-zinc-900/90 border border-zinc-800 px-3.5 py-1.5 rounded-full shadow-sm">
-                    <span class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                    <span class="text-xs text-zinc-300 font-mono">Cluster: <strong class="text-emerald-400 font-normal">Active</strong></span>
+                <div class="flex items-center gap-2 bg-[#21262d] border border-[#30363d] px-3.5 py-1.5 rounded-lg shadow-sm">
+                    <span class="h-2 w-2 rounded-full bg-[#3fb950] animate-pulse"></span>
+                    <span class="text-xs text-[#c9d1d9] font-mono">Cluster: <strong class="text-[#3fb950] font-normal">Active</strong></span>
                 </div>
             </div>
         </div>
@@ -59,53 +51,53 @@
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
                 <h1 class="text-xl font-bold text-white tracking-tight">Monitoramento do Compset Concorrencial</h1>
-                <p class="text-xs text-zinc-400 mt-0.5">Dispare ordens de scraping em tempo real para os nós de coleta.</p>
+                <p class="text-xs text-[#8b949e] mt-0.5">Dispare ordens de scraping em tempo real para os nós de coleta.</p>
             </div>
             
             <div class="flex items-center gap-2">
-                <span class="text-xs text-zinc-500 font-medium">Concorrentes:</span>
-                <button onclick="setHotel('Hotel Palace Poços')" class="text-xs bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 px-3 py-1.5 rounded-lg transition">Hotel Palace</button>
-                <button onclick="setHotel('Hotel Nacional Inn')" class="text-xs bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 px-3 py-1.5 rounded-lg transition">Nacional Inn</button>
-                <button onclick="setHotel('Thermas Resort')" class="text-xs bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 px-3 py-1.5 rounded-lg transition">Thermas Resort</button>
+                <span class="text-xs text-[#6e7681] font-medium">Atalhos:</span>
+                <button onclick="setHotel('Hotel Palace Poços')" class="text-xs bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-[#c9d1d9] px-3 py-1.5 rounded-lg transition">Hotel Palace</button>
+                <button onclick="setHotel('Hotel Nacional Inn')" class="text-xs bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-[#c9d1d9] px-3 py-1.5 rounded-lg transition">Nacional Inn</button>
+                <button onclick="setHotel('Thermas Resort')" class="text-xs bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-[#c9d1d9] px-3 py-1.5 rounded-lg transition">Thermas Resort</button>
             </div>
         </div>
 
         <!-- Executive KPI Cards -->
         <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div class="bg-zinc-900/50 border border-zinc-800/80 p-5 rounded-2xl shadow-sm hover:border-zinc-700/80 transition">
+            <div class="bg-[#0d1117] border border-[#30363d] p-5 rounded-xl shadow-sm hover:border-[#8b949e]/50 transition">
                 <div class="flex justify-between items-start">
-                    <span class="text-xs font-medium text-zinc-400">Total de Coletas</span>
-                    <span class="text-[10px] bg-zinc-800 text-zinc-400 font-mono px-2 py-0.5 rounded">JOBS</span>
+                    <span class="text-xs font-medium text-[#8b949e]">Total de Coletas</span>
+                    <span class="text-[10px] bg-[#21262d] text-[#8b949e] font-mono px-2 py-0.5 rounded border border-[#30363d]">JOBS</span>
                 </div>
                 <div class="text-2xl font-bold text-white mt-2" id="kpiTotal">0</div>
-                <p class="text-[11px] text-zinc-500 mt-1">Consultas processadas com sucesso</p>
+                <p class="text-[11px] text-[#6e7681] mt-1">Consultas processadas com sucesso</p>
             </div>
 
-            <div class="bg-zinc-900/50 border border-zinc-800/80 p-5 rounded-2xl shadow-sm hover:border-zinc-700/80 transition">
+            <div class="bg-[#0d1117] border border-[#30363d] p-5 rounded-xl shadow-sm hover:border-[#8b949e]/50 transition">
                 <div class="flex justify-between items-start">
-                    <span class="text-xs font-medium text-zinc-400">Média Compset (Diária)</span>
-                    <span class="text-[10px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-mono px-2 py-0.5 rounded">BRL</span>
+                    <span class="text-xs font-medium text-[#8b949e]">Média Compset (Diária)</span>
+                    <span class="text-[10px] bg-[#1f6feb]/10 text-[#58a6ff] border border-[#1f6feb]/20 font-mono px-2 py-0.5 rounded">BRL</span>
                 </div>
-                <div class="text-2xl font-bold text-indigo-400 mt-2" id="kpiAvg">R$ 0,00</div>
-                <p class="text-[11px] text-zinc-500 mt-1">Média das diárias capturadas</p>
+                <div class="text-2xl font-bold text-[#58a6ff] mt-2" id="kpiAvg">R$ 0,00</div>
+                <p class="text-[11px] text-[#6e7681] mt-1">Média das diárias capturadas</p>
             </div>
 
-            <div class="bg-zinc-900/50 border border-zinc-800/80 p-5 rounded-2xl shadow-sm hover:border-zinc-700/80 transition">
+            <div class="bg-[#0d1117] border border-[#30363d] p-5 rounded-xl shadow-sm hover:border-[#8b949e]/50 transition">
                 <div class="flex justify-between items-start">
-                    <span class="text-xs font-medium text-zinc-400">Menor Tarifa Mapeada</span>
-                    <span class="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono px-2 py-0.5 rounded">BEST RATE</span>
+                    <span class="text-xs font-medium text-[#8b949e]">Menor Tarifa Mapeada</span>
+                    <span class="text-[10px] bg-[#238636]/15 text-[#3fb950] border border-[#238636]/30 font-mono px-2 py-0.5 rounded">BEST RATE</span>
                 </div>
-                <div class="text-2xl font-bold text-emerald-400 mt-2" id="kpiMin">R$ 0,00</div>
-                <p class="text-[11px] text-zinc-500 mt-1">Oportunidade mínima de mercado</p>
+                <div class="text-2xl font-bold text-[#3fb950] mt-2" id="kpiMin">R$ 0,00</div>
+                <p class="text-[11px] text-[#6e7681] mt-1">Oportunidade mínima de mercado</p>
             </div>
 
-            <div class="bg-zinc-900/50 border border-zinc-800/80 p-5 rounded-2xl shadow-sm hover:border-zinc-700/80 transition">
+            <div class="bg-[#0d1117] border border-[#30363d] p-5 rounded-xl shadow-sm hover:border-[#8b949e]/50 transition">
                 <div class="flex justify-between items-start">
-                    <span class="text-xs font-medium text-zinc-400">Latência dos Workers</span>
-                    <span class="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 font-mono px-2 py-0.5 rounded">REST I/O</span>
+                    <span class="text-xs font-medium text-[#8b949e]">Latência dos Workers</span>
+                    <span class="text-[10px] bg-[#9e6a03]/15 text-[#d29922] border border-[#9e6a03]/30 font-mono px-2 py-0.5 rounded">REST I/O</span>
                 </div>
-                <div class="text-2xl font-bold text-amber-400 mt-2" id="kpiLatency">0 ms</div>
-                <p class="text-[11px] text-zinc-500 mt-1">Tempo médio de resposta inter-serviços</p>
+                <div class="text-2xl font-bold text-[#d29922] mt-2" id="kpiLatency">0 ms</div>
+                <p class="text-[11px] text-[#6e7681] mt-1">Tempo médio de resposta inter-serviços</p>
             </div>
         </section>
 
@@ -113,35 +105,35 @@
         <section class="grid lg:grid-cols-3 gap-8 items-start">
             
             <!-- Control Panel Form -->
-            <div class="bg-zinc-900/50 border border-zinc-800/80 p-6 rounded-2xl shadow-sm space-y-5">
-                <div class="border-b border-zinc-800/80 pb-3">
-                    <h2 class="text-sm font-bold text-zinc-100">Parâmetros da Consulta</h2>
-                    <p class="text-xs text-zinc-400 mt-0.5">Configure os dados do hotel e o período.</p>
+            <div class="bg-[#0d1117] border border-[#30363d] p-6 rounded-xl shadow-sm space-y-5">
+                <div class="border-b border-[#30363d] pb-3">
+                    <h2 class="text-sm font-bold text-white">Parâmetros da Consulta</h2>
+                    <p class="text-xs text-[#8b949e] mt-0.5">Configure os dados do hotel e o período.</p>
                 </div>
                 
                 <form id="dispatchForm" class="space-y-4">
                     <div>
-                        <label class="block text-xs font-medium text-zinc-300 mb-1.5">Hotel Concorrente</label>
+                        <label class="block text-xs font-medium text-[#c9d1d9] mb-1.5">Hotel Concorrente</label>
                         <input type="text" id="hotelName" required value="Hotel Palace Poços" 
-                               class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2 text-zinc-100 text-sm focus:outline-none focus:border-indigo-500 transition shadow-inner">
+                               class="w-full bg-[#21262d] border border-[#30363d] rounded-lg px-3.5 py-2 text-white text-sm focus:outline-none focus:border-[#1f6feb] transition">
                     </div>
 
                     <div class="grid grid-cols-2 gap-3">
                         <div>
-                            <label class="block text-xs font-medium text-zinc-300 mb-1.5">Check-in</label>
+                            <label class="block text-xs font-medium text-[#c9d1d9] mb-1.5">Check-in</label>
                             <input type="date" id="checkin" required value="2026-09-25"
-                                   class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-zinc-100 text-xs focus:outline-none focus:border-indigo-500 transition">
+                                   class="w-full bg-[#21262d] border border-[#30363d] rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-[#1f6feb] transition">
                         </div>
                         <div>
-                            <label class="block text-xs font-medium text-zinc-300 mb-1.5">Check-out</label>
+                            <label class="block text-xs font-medium text-[#c9d1d9] mb-1.5">Check-out</label>
                             <input type="date" id="checkout" required value="2026-09-27"
-                                   class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-zinc-100 text-xs focus:outline-none focus:border-indigo-500 transition">
+                                   class="w-full bg-[#21262d] border border-[#30363d] rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-[#1f6feb] transition">
                         </div>
                     </div>
 
                     <div>
-                        <label class="block text-xs font-medium text-zinc-300 mb-1.5">Canal de Origem</label>
-                        <select id="otaSource" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2 text-zinc-300 text-xs focus:outline-none focus:border-indigo-500">
+                        <label class="block text-xs font-medium text-[#c9d1d9] mb-1.5">Canal de Origem</label>
+                        <select id="otaSource" class="w-full bg-[#21262d] border border-[#30363d] rounded-lg px-3.5 py-2 text-[#c9d1d9] text-xs focus:outline-none focus:border-[#1f6feb]">
                             <option value="Booking.com">Booking.com (OTA)</option>
                             <option value="Expedia">Expedia Group</option>
                             <option value="Direto">Website Direto do Hotel</option>
@@ -149,22 +141,22 @@
                     </div>
                     
                     <button type="submit" id="submitBtn" 
-                            class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2.5 rounded-xl shadow-lg shadow-indigo-600/20 transition text-xs flex justify-center items-center gap-2">
+                            class="w-full bg-[#238636] hover:bg-[#2ea043] text-white font-medium py-2.5 rounded-lg shadow transition text-xs flex justify-center items-center gap-2">
                         <span>Disparar Varredura Distribuída</span>
                     </button>
                 </form>
 
-                <div id="errorBox" class="hidden bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-xl text-xs"></div>
+                <div id="errorBox" class="hidden bg-[#f85149]/10 border border-[#f85149]/30 text-[#f85149] p-3 rounded-lg text-xs"></div>
             </div>
 
             <!-- Analytics Chart -->
-            <div class="lg:col-span-2 bg-zinc-900/50 border border-zinc-800/80 p-6 rounded-2xl shadow-sm flex flex-col justify-between h-[385px]">
-                <div class="flex justify-between items-center border-b border-zinc-800/80 pb-3">
+            <div class="lg:col-span-2 bg-[#0d1117] border border-[#30363d] p-6 rounded-xl shadow-sm flex flex-col justify-between h-[385px]">
+                <div class="flex justify-between items-center border-b border-[#30363d] pb-3">
                     <div>
-                        <h2 class="text-sm font-bold text-zinc-100">Tendência Tarifária</h2>
-                        <p class="text-xs text-zinc-400">Histórico de flutuação dos valores retornados pelos workers.</p>
+                        <h2 class="text-sm font-bold text-white">Tendência Tarifária</h2>
+                        <p class="text-xs text-[#8b949e]">Histórico de flutuação dos valores retornados pelos workers.</p>
                     </div>
-                    <span class="text-[10px] bg-zinc-800/80 text-zinc-400 border border-zinc-700/50 px-2.5 py-1 rounded-full font-mono">Real-time Feed</span>
+                    <span class="text-[10px] bg-[#21262d] text-[#8b949e] border border-[#30363d] px-2.5 py-1 rounded font-mono">Live Feed</span>
                 </div>
                 
                 <div class="relative w-full h-[270px] pt-2">
@@ -174,17 +166,17 @@
         </section>
 
         <!-- Audit Trail Table -->
-        <section class="bg-zinc-900/50 border border-zinc-800/80 p-6 rounded-2xl shadow-sm space-y-4">
-            <div class="flex justify-between items-center border-b border-zinc-800/80 pb-3">
+        <section class="bg-[#0d1117] border border-[#30363d] p-6 rounded-xl shadow-sm space-y-4">
+            <div class="flex justify-between items-center border-b border-[#30363d] pb-3">
                 <div>
-                    <h2 class="text-sm font-bold text-zinc-100">Auditoria de Tarefas Executadas</h2>
-                    <p class="text-xs text-zinc-400">Registro completo das requisições tratadas pelo cluster.</p>
+                    <h2 class="text-sm font-bold text-white">Auditoria de Tarefas Executadas</h2>
+                    <p class="text-xs text-[#8b949e]">Registro completo das requisições tratadas pelo cluster.</p>
                 </div>
             </div>
             
             <div class="overflow-x-auto">
-                <table class="w-full text-left text-xs text-zinc-300">
-                    <thead class="text-[11px] text-zinc-400 uppercase bg-zinc-950/60 border-b border-zinc-800/80">
+                <table class="w-full text-left text-xs text-[#c9d1d9]">
+                    <thead class="text-[11px] text-[#8b949e] uppercase bg-[#161b22] border-b border-[#30363d]">
                         <tr>
                             <th class="py-3 px-4 font-semibold">Job ID</th>
                             <th class="py-3 px-4 font-semibold">Hotel Alvo</th>
@@ -194,9 +186,9 @@
                             <th class="py-3 px-4 font-semibold">Horário</th>
                         </tr>
                     </thead>
-                    <tbody id="historyTable" class="divide-y divide-zinc-800/60 font-mono">
+                    <tbody id="historyTable" class="divide-y divide-[#30363d]/60 font-mono">
                         <tr id="emptyTableMsg">
-                            <td colspan="6" class="py-10 text-center text-zinc-500 font-sans">
+                            <td colspan="6" class="py-10 text-center text-[#8b949e] font-sans">
                                 Nenhum job executado nesta sessão.
                             </td>
                         </tr>
@@ -207,7 +199,7 @@
     </main>
 
     <!-- Footer -->
-    <footer class="border-t border-zinc-800/80 py-4 text-center text-xs text-zinc-500">
+    <footer class="border-t border-[#30363d] py-4 text-center text-xs text-[#8b949e]">
         HospedaSync &copy; 2026 — Arquitetura Orientada a Microsserviços
     </footer>
 
@@ -219,7 +211,7 @@
             document.getElementById('hotelName').value = name;
         }
 
-        // Configuração do Gráfico Chart.js com Paleta Indigo
+        // Configuração do Gráfico Chart.js
         const ctx = document.getElementById('rateChart').getContext('2d');
         const rateChart = new Chart(ctx, {
             type: 'line',
@@ -228,22 +220,22 @@
                 datasets: [{
                     label: 'Tarifa (BRL)',
                     data: [],
-                    borderColor: '#6366f1',
-                    backgroundColor: 'rgba(99, 102, 241, 0.08)',
+                    borderColor: '#58a6ff',
+                    backgroundColor: 'rgba(88, 166, 255, 0.1)',
                     borderWidth: 2,
                     fill: true,
                     tension: 0.25,
                     pointRadius: 4,
                     pointHoverRadius: 6,
-                    pointBackgroundColor: '#818cf8'
+                    pointBackgroundColor: '#79c0ff'
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {
-                    x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#71717a', font: { size: 10 } } },
-                    y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#71717a', font: { size: 10 } }, beginAtZero: false }
+                    x: { grid: { color: 'rgba(240,246,252,0.05)' }, ticks: { color: '#8b949e', font: { size: 10 } } },
+                    y: { grid: { color: 'rgba(240,246,252,0.05)' }, ticks: { color: '#8b949e', font: { size: 10 } }, beginAtZero: false }
                 },
                 plugins: { legend: { display: false } }
             }
@@ -333,14 +325,14 @@
             const latest = historyData[historyData.length - 1];
 
             const row = document.createElement('tr');
-            row.className = "hover:bg-zinc-800/30 transition";
+            row.className = "hover:bg-[#21262d]/50 transition";
             row.innerHTML = `
-                <td class="py-3 px-4 text-indigo-400 font-medium">${latest.job_id}</td>
-                <td class="py-3 px-4 font-sans text-zinc-200">${latest.hotel}</td>
-                <td class="py-3 px-4 text-emerald-400 font-semibold">R$ ${latest.price.toFixed(2)}</td>
-                <td class="py-3 px-4 text-zinc-400">${latest.worker}</td>
-                <td class="py-3 px-4 text-amber-400">${latest.latency} ms</td>
-                <td class="py-3 px-4 text-zinc-500">${latest.time}</td>
+                <td class="py-3 px-4 text-[#58a6ff] font-medium">${latest.job_id}</td>
+                <td class="py-3 px-4 font-sans text-white">${latest.hotel}</td>
+                <td class="py-3 px-4 text-[#3fb950] font-semibold">R$ ${latest.price.toFixed(2)}</td>
+                <td class="py-3 px-4 text-[#8b949e]">${latest.worker}</td>
+                <td class="py-3 px-4 text-[#d29922]">${latest.latency} ms</td>
+                <td class="py-3 px-4 text-[#6e7681]">${latest.time}</td>
             `;
 
             tbody.insertBefore(row, tbody.firstChild);
