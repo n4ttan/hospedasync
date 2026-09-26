@@ -1,4 +1,6 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import httpx
 import os
@@ -6,12 +8,19 @@ import uuid
 
 app = FastAPI(title="HospedaSync API Gateway", version="1.0.0")
 
+# Servir a pasta static
+app.mount("/static", StaticFiles(directory="api-gateway/static"), name="static")
+
 WORKER_URL = os.getenv("WORKER_SERVICE_URL", "http://127.0.0.1:8001")
 
 class TriggerJobRequest(BaseModel):
     hotel_name: str
     checkin_date: str
     checkout_date: str
+
+@app.get("/")
+async def read_index():
+    return FileResponse("api-gateway/static/index.html")
 
 @app.get("/health")
 def health():
