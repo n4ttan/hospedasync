@@ -1,26 +1,48 @@
 services:
-  worker-node:
-    build:
-      context: ./workers
-    container_name: hospeda_worker
+  postgres-db:
+    image: postgres:15-alpine
+    container_name: hospeda_db
+    environment:
+      POSTGRES_DB: hospedasync_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
     ports:
-      - "8001:8001"
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
     networks:
       - hospeda-net
 
   api-gateway:
-    build:
-      context: ./api-gateway
+    build: ./api-gateway
     container_name: hospeda_gateway
     ports:
       - "8000:8000"
     environment:
       - WORKER_SERVICE_URL=http://worker-node:8001
+      - DATABASE_URL=postgresql+psycopg2://postgres:postgrespassword@postgres-db:5432/hospedasync_db
     depends_on:
-      - worker-node
+      - postgres-db
+    networks:
+      - hospeda-net
+
+  worker-node:
+    build: ./workers
+    container_name: hospeda_worker
+    ports:
+      - "8001:8001"
+    environment:
+      - GATEWAY_URL=http://api-gateway:8000
+      - WORKER_ID=worker-01
+      - PORT=8001
+    depends_on:
+      - api-gateway
     networks:
       - hospeda-net
 
 networks:
   hospeda-net:
     driver: bridge
+
+volumes:
+  postgres_data:
