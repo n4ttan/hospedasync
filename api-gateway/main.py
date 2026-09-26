@@ -5,11 +5,16 @@ from pydantic import BaseModel
 import httpx
 import os
 import uuid
+from pathlib import Path
 
 app = FastAPI(title="HospedaSync API Gateway", version="1.0.0")
 
-# Servir a pasta static
-app.mount("/static", StaticFiles(directory="api-gateway/static"), name="static")
+# Caminhos absolutos/dinâmicos para arquivos estáticos
+BASE_DIR = Path(__file__).resolve().parent
+STATIC_DIR = BASE_DIR / "static"
+
+if STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 WORKER_URL = os.getenv("WORKER_SERVICE_URL", "http://127.0.0.1:8001")
 
@@ -20,7 +25,10 @@ class TriggerJobRequest(BaseModel):
 
 @app.get("/")
 async def read_index():
-    return FileResponse("api-gateway/static/index.html")
+    index_file = STATIC_DIR / "index.html"
+    if index_file.exists():
+        return FileResponse(str(index_file))
+    return {"message": "HospedaSync API Gateway em execução. Interface estática não localizada."}
 
 @app.get("/health")
 def health():
