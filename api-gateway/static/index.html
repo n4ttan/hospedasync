@@ -3,130 +3,198 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HospedaSync - Painel Tarifário</title>
+    <title>HospedaSync - Monitoramento Tarifário</title>
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js para Gráficos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between">
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased">
 
-    <!-- Header -->
-    <header class="border-b border-slate-800 bg-slate-950/80 backdrop-blur sticky top-0 z-50">
-        <div class="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
+    <!-- Header / Navbar -->
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
             <div class="flex items-center space-x-3">
-                <span class="text-2xl">🏨🔄</span>
-                <h1 class="text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
-                    HospedaSync
-                </h1>
+                <div class="p-2 bg-blue-600/20 border border-blue-500/30 rounded-xl text-xl">🏨</div>
+                <div>
+                    <h1 class="text-xl font-bold bg-gradient-to-r from-blue-400 via-indigo-400 to-cyan-400 bg-clip-text text-transparent">
+                        HospedaSync
+                    </h1>
+                    <p class="text-xs text-slate-400">Rate Shopper & Monitoramento Tarifário Distribuído</p>
+                </div>
             </div>
-            <span class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full font-mono">
-                Sistema Distribuído Ativo
-            </span>
+            <div class="flex items-center gap-3">
+                <span class="flex h-2.5 w-2.5 relative">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                </span>
+                <span class="text-xs bg-slate-800 text-slate-300 border border-slate-700 px-3 py-1.5 rounded-lg font-mono">
+                    Cluster Status: <span class="text-emerald-400 font-semibold">HEALTHY</span>
+                </span>
+            </div>
         </div>
     </header>
 
-    <!-- Conteúdo Principal -->
-    <main class="max-w-5xl mx-auto px-4 py-8 w-full flex-1 grid md:grid-cols-2 gap-8 items-start">
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-6 py-8 w-full flex-1 space-y-8">
         
-        <!-- Formulário de Disparo -->
-        <div class="bg-slate-800/50 border border-slate-700/60 p-6 rounded-2xl shadow-xl">
-            <h2 class="text-lg font-semibold mb-4 text-slate-200 flex items-center gap-2">
-                <span>🎯</span> Solicitar Consulta de Tarifa
-            </h2>
-            <form id="dispatchForm" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-400 mb-1">Hotel Concorrente</label>
-                    <input type="text" id="hotelName" required value="Hotel Palace Pocos" 
-                           class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 focus:outline-none focus:border-blue-500 transition">
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-400 mb-1">Check-in</label>
-                        <input type="date" id="checkin" required value="2026-09-25"
-                               class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 focus:outline-none focus:border-blue-500 transition">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-400 mb-1">Check-out</label>
-                        <input type="date" id="checkout" required value="2026-09-27"
-                               class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-slate-100 focus:outline-none focus:border-blue-500 transition">
-                    </div>
-                </div>
-                <button type="submit" id="submitBtn" 
-                        class="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-3 rounded-lg shadow-lg shadow-blue-600/20 transition flex justify-center items-center gap-2">
-                    <span>Disparar Varredura Distribuída</span>
-                </button>
-            </form>
-        </div>
+        <!-- Top Metrics Cards (KPIs) -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-slate-900/60 border border-slate-800 p-5 rounded-2xl shadow-sm">
+                <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Total de Coletas</span>
+                <div class="text-2xl font-bold text-slate-100 mt-1" id="kpiTotal">0</div>
+                <span class="text-xs text-slate-500 mt-1 block">Jobs despachados no cluster</span>
+            </div>
+            <div class="bg-slate-900/60 border border-slate-800 p-5 rounded-2xl shadow-sm">
+                <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Tarifa Média Encontrada</span>
+                <div class="text-2xl font-bold text-blue-400 mt-1" id="kpiAvg">R$ 0,00</div>
+                <span class="text-xs text-slate-500 mt-1 block">Média das consultas efetuadas</span>
+            </div>
+            <div class="bg-slate-900/60 border border-slate-800 p-5 rounded-2xl shadow-sm">
+                <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Menor Tarifa Mapeada</span>
+                <div class="text-2xl font-bold text-emerald-400 mt-1" id="kpiMin">R$ 0,00</div>
+                <span class="text-xs text-slate-500 mt-1 block">Oportunidade de mercado</span>
+            </div>
+            <div class="bg-slate-900/60 border border-slate-800 p-5 rounded-2xl shadow-sm">
+                <span class="text-xs font-medium text-slate-400 uppercase tracking-wider">Latência Média Worker</span>
+                <div class="text-2xl font-bold text-amber-400 mt-1" id="kpiLatency">0 ms</div>
+                <span class="text-xs text-slate-500 mt-1 block">Comunicação REST inter-serviços</span>
+            </div>
+        </section>
 
-        <!-- Painel de Resultados -->
-        <div class="bg-slate-800/50 border border-slate-700/60 p-6 rounded-2xl shadow-xl flex flex-col justify-between min-h-[340px]">
-            <div>
-                <h2 class="text-lg font-semibold mb-4 text-slate-200 flex items-center gap-2">
-                    <span>📊</span> Resultado do Worker
+        <!-- Form + Live Chart Grid -->
+        <section class="grid lg:grid-cols-3 gap-8 items-start">
+            
+            <!-- Form Card -->
+            <div class="bg-slate-900/80 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-4">
+                <h2 class="text-base font-semibold text-slate-200 flex items-center gap-2">
+                    <span>⚡</span> Disparar Coleta de Tarifa
                 </h2>
-
-                <!-- Estado Inicial / Vazio -->
-                <div id="placeholderState" class="text-center py-12 text-slate-500">
-                    <p class="text-4xl mb-2">📡</p>
-                    <p>Nenhuma ordem enviada. Aguardando disparo...</p>
-                </div>
-
-                <!-- Estado de Loading -->
-                <div id="loadingState" class="hidden text-center py-12">
-                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent mb-3"></div>
-                    <p class="text-slate-400 text-sm">Consultando nó worker distribuído...</p>
-                </div>
-
-                <!-- Card de Resultado -->
-                <div id="resultCard" class="hidden space-y-4">
-                    <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-700/50">
-                        <span class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Tarifa Encontrada</span>
-                        <div class="text-3xl font-extrabold text-emerald-400 mt-1" id="resPrice">R$ 0,00</div>
+                
+                <form id="dispatchForm" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Hotel Concorrente</label>
+                        <input type="text" id="hotelName" required value="Hotel Palace Pocos" 
+                               class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-100 text-sm focus:outline-none focus:border-blue-500 transition">
                     </div>
-
-                    <div class="grid grid-cols-2 gap-3 text-sm">
-                        <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-800">
-                            <span class="text-slate-500 block text-xs">Hotel</span>
-                            <span class="font-medium text-slate-200" id="resHotel">-</span>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Check-in</label>
+                            <input type="date" id="checkin" required value="2026-09-25"
+                                   class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-slate-100 text-sm focus:outline-none focus:border-blue-500 transition">
                         </div>
-                        <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-800">
-                            <span class="text-slate-500 block text-xs">Job ID</span>
-                            <span class="font-mono text-xs text-blue-400" id="resJobId">-</span>
-                        </div>
-                        <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-800">
-                            <span class="text-slate-500 block text-xs">Nó Processador</span>
-                            <span class="font-mono text-xs text-slate-300" id="resWorker">-</span>
-                        </div>
-                        <div class="bg-slate-900/50 p-3 rounded-lg border border-slate-800">
-                            <span class="text-slate-500 block text-xs">Latência do Scraping</span>
-                            <span class="font-mono text-xs text-amber-400" id="resTime">-</span>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Check-out</label>
+                            <input type="date" id="checkout" required value="2026-09-27"
+                                   class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-slate-100 text-sm focus:outline-none focus:border-blue-500 transition">
                         </div>
                     </div>
+                    
+                    <button type="submit" id="submitBtn" 
+                            class="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-3 rounded-xl shadow-lg shadow-blue-600/20 transition flex justify-center items-center gap-2 text-sm">
+                        <span>Executar Scraping Distribuído</span>
+                    </button>
+                </form>
+
+                <div id="errorBox" class="hidden bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-xl text-xs"></div>
+            </div>
+
+            <!-- Visual Chart Container -->
+            <div class="lg:col-span-2 bg-slate-900/80 border border-slate-800 p-6 rounded-2xl shadow-xl flex flex-col justify-between min-h-[360px]">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-base font-semibold text-slate-200 flex items-center gap-2">
+                        <span>📈</span> Histórico de Flutuação Tarifária
+                    </h2>
+                    <span class="text-xs text-slate-500">Tempo Real</span>
+                </div>
+                
+                <div class="relative w-full h-[260px]">
+                    <canvas id="rateChart"></canvas>
                 </div>
             </div>
-            <div id="errorState" class="hidden mt-4 bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-lg text-sm"></div>
-        </div>
+        </section>
+
+        <!-- Recent Activity Table -->
+        <section class="bg-slate-900/80 border border-slate-800 p-6 rounded-2xl shadow-xl">
+            <h2 class="text-base font-semibold text-slate-200 mb-4 flex items-center gap-2">
+                <span>📋</span> Log das Últimas Varreduras
+            </h2>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm text-slate-300">
+                    <thead class="text-xs text-slate-400 uppercase bg-slate-950/60 border-b border-slate-800">
+                        <tr>
+                            <th class="py-3 px-4">Job ID</th>
+                            <th class="py-3 px-4">Hotel</th>
+                            <th class="py-3 px-4">Tarifa (BRL)</th>
+                            <th class="py-3 px-4">Worker Node</th>
+                            <th class="py-3 px-4">Latência</th>
+                            <th class="py-3 px-4">Horário</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyTable" class="divide-y divide-slate-800/60 font-mono text-xs">
+                        <tr id="emptyTableMsg">
+                            <td colspan="6" class="py-8 text-center text-slate-500 font-sans">
+                                Nenhum registro de varredura nesta sessão. Faça a primeira consulta acima.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
     </main>
 
     <!-- Footer -->
-    <footer class="border-t border-slate-800 py-4 text-center text-xs text-slate-500">
-        HospedaSync &copy; 2026 - Desenvolvido para a disciplina de Sistemas Distribuídos
+    <footer class="border-t border-slate-800/80 py-4 text-center text-xs text-slate-500">
+        HospedaSync System &copy; 2026 — Arquitetura Orientada a Microsserviços & Execução em Nuvem
     </footer>
 
-    <!-- Lógica JS -->
+    <!-- Frontend Script -->
     <script>
+        // Histórico de Dados Local
+        let historyData = [];
+
+        // Inicializar Gráfico Chart.js
+        const ctx = document.getElementById('rateChart').getContext('2d');
+        const rateChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Tarifa (R$)',
+                    data: [],
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.35,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#60a5fa'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { grid: { color: '#1e293b' }, ticks: { color: '#64748b' } },
+                    y: { grid: { color: '#1e293b' }, ticks: { color: '#64748b' }, beginAtZero: false }
+                },
+                plugins: {
+                    legend: { display: false }
+                }
+            }
+        });
+
+        // Evento de envio do formulário
         document.getElementById('dispatchForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
             const btn = document.getElementById('submitBtn');
-            const placeholder = document.getElementById('placeholderState');
-            const loading = document.getElementById('loadingState');
-            const card = document.getElementById('resultCard');
-            const errBox = document.getElementById('errorState');
-
+            const errBox = document.getElementById('errorBox');
+            
             btn.disabled = true;
-            placeholder.classList.add('hidden');
-            card.classList.add('hidden');
+            btn.innerText = 'Processando no Worker...';
             errBox.classList.add('hidden');
-            loading.classList.remove('hidden');
 
             const payload = {
                 hotel_name: document.getElementById('hotelName').value,
@@ -143,23 +211,80 @@
 
                 const data = await res.json();
 
-                if (!res.ok) throw new Error(data.detail || 'Erro ao processar chamada');
+                if (!res.ok) throw new Error(data.detail || 'Erro na requisição');
 
-                document.getElementById('resPrice').innerText = R$ ;
-                document.getElementById('resHotel').innerText = data.result.hotel_name;
-                document.getElementById('resJobId').innerText = data.result.job_id;
-                document.getElementById('resWorker').innerText = data.dispatched_to;
-                document.getElementById('resTime').innerText = ${data.result.processing_time_ms} ms;
+                // Adicionar ao histórico local
+                const item = {
+                    job_id: data.result.job_id,
+                    hotel: data.result.hotel_name,
+                    price: data.result.daily_rate,
+                    worker: data.dispatched_to,
+                    latency: data.result.processing_time_ms,
+                    time: new Date().toLocaleTimeString()
+                };
 
-                card.classList.remove('hidden');
+                historyData.push(item);
+
+                // Atualizar Interface
+                updateKPIs();
+                updateChart();
+                updateTable();
+
             } catch (err) {
                 errBox.innerText = err.message;
                 errBox.classList.remove('hidden');
             } finally {
-                loading.classList.add('hidden');
                 btn.disabled = false;
+                btn.innerText = 'Executar Scraping Distribuído';
             }
         });
+
+        function updateKPIs() {
+            if (historyData.length === 0) return;
+
+            const prices = historyData.map(d => d.price);
+            const latencies = historyData.map(d => d.latency);
+
+            const total = historyData.length;
+            const avg = prices.reduce((a, b) => a + b, 0) / total;
+            const min = Math.min(...prices);
+            const avgLat = latencies.reduce((a, b) => a + b, 0) / total;
+
+            document.getElementById('kpiTotal').innerText = total;
+            document.getElementById('kpiAvg').innerText = `R$ ${avg.toFixed(2)}`;
+            document.getElementById('kpiMin').innerText = `R$ ${min.toFixed(2)}`;
+            document.getElementById('kpiLatency').innerText = `${avgLat.toFixed(1)} ms`;
+        }
+
+        function updateChart() {
+            rateChart.data.labels = historyData.map(d => d.time);
+            rateChart.data.datasets[0].data = historyData.map(d => d.price);
+            rateChart.update();
+        }
+
+        function updateTable() {
+            const tbody = document.getElementById('historyTable');
+            
+            if (historyData.length > 0) {
+                const emptyMsg = document.getElementById('emptyTableMsg');
+                if (emptyMsg) emptyMsg.remove();
+            }
+
+            const latest = historyData[historyData.length - 1];
+
+            const row = document.createElement('tr');
+            row.className = "hover:bg-slate-800/40 transition";
+            row.innerHTML = `
+                <td class="py-3 px-4 text-blue-400">${latest.job_id}</td>
+                <td class="py-3 px-4 font-sans text-slate-200">${latest.hotel}</td>
+                <td class="py-3 px-4 text-emerald-400 font-bold">R$ ${latest.price.toFixed(2)}</td>
+                <td class="py-3 px-4 text-slate-400">${latest.worker}</td>
+                <td class="py-3 px-4 text-amber-400">${latest.latency} ms</td>
+                <td class="py-3 px-4 text-slate-500">${latest.time}</td>
+            `;
+
+            tbody.insertBefore(row, tbody.firstChild);
+        }
     </script>
 </body>
 </html>
