@@ -11,6 +11,7 @@ import random
 from pathlib import Path
 
 from database import init_db, SessionLocal, JobHistory
+from distlock import acquire_lock, release_lock, is_locked, check_connection
 
 app = FastAPI(title="HospedaSync API Gateway", version="1.0.0")
 
@@ -55,7 +56,18 @@ async def read_index():
 
 @app.get("/health")
 def health():
-    return {"status": "UP", "service": "api-gateway", "registered_workers": len(ACTIVE_WORKERS)}
+    redis_ok = check_connection()
+    return {
+        "status": "UP",
+        "service": "api-gateway",
+        "registered_workers": len(ACTIVE_WORKERS),
+        "redis_lock_connection": "UP" if redis_ok else "DOWN"
+    }
+
+@app.get("/locks/{hotel_name}")
+def get_lock_status(hotel_name: str):
+    """Endpoint de diagnostico: informa se o hotel esta com lock ativo."""
+    return {"hotel_name": hotel_name, "locked": is_locked(hotel_name)}
 
 @app.post("/registry/register")
 def register_worker(req: RegisterWorkerRequest):
@@ -91,40 +103,52 @@ async def dispatch_job(req: TriggerJobRequest, db: Session = Depends(get_db)):
         "checkin_date": req.checkin_date,
         "checkout_date": req.checkout_date
     }
-    
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.post(f"{target_url}/scrape", json=payload)
-            if response.status_code != 200:
-                raise HTTPException(status_code=502, detail="Erro retornado pelo no worker.")
-            worker_data = response.json()
-            
-    except httpx.RequestError as exc:
+
+    # Exclusao mutua: garante que apenas uma requisicao processe o mesmo
+    # hotel por vez. O owner_id e o job_id, usado tambem para liberar o
+    # lock de forma segura (so quem adquiriu pode liberar).
+    if not acquire_lock(req.hotel_name, owner_id=job_id):
         raise HTTPException(
-            status_code=503, 
-            detail=f"Falha ao conectar ao Worker ({target_url}): {str(exc)}"
+            status_code=409,
+            detail=f"O hotel '{req.hotel_name}' ja esta sendo processado por outra requisicao. Tente novamente em instantes."
         )
 
-    # Persistência no Banco PostgreSQL
     try:
-        db_job = JobHistory(
-            job_id=worker_data["job_id"],
-            hotel_name=worker_data["hotel_name"],
-            daily_rate=worker_data["daily_rate"],
-            processed_by=worker_data["processed_by"],
-            processing_time_ms=worker_data["processing_time_ms"],
-            checkin_date=worker_data["checkin_date"],
-            checkout_date=worker_data["checkout_date"]
-        )
-        db.add(db_job)
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        print(f"Erro ao salvar no banco: {e}")
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.post(f"{target_url}/scrape", json=payload)
+                if response.status_code != 200:
+                    raise HTTPException(status_code=502, detail="Erro retornado pelo no worker.")
+                worker_data = response.json()
 
-    return {
-        "gateway_status": "SUCCESS",
-        "dispatched_to": target_url,
-        "selected_worker_id": selected_id,
-        "result": worker_data
-    }
+        except httpx.RequestError as exc:
+            raise HTTPException(
+                status_code=503,
+                detail=f"Falha ao conectar ao Worker ({target_url}): {str(exc)}"
+            )
+
+        # Persistência no Banco PostgreSQL
+        try:
+            db_job = JobHistory(
+                job_id=worker_data["job_id"],
+                hotel_name=worker_data["hotel_name"],
+                daily_rate=worker_data["daily_rate"],
+                processed_by=worker_data["processed_by"],
+                processing_time_ms=worker_data["processing_time_ms"],
+                checkin_date=worker_data["checkin_date"],
+                checkout_date=worker_data["checkout_date"]
+            )
+            db.add(db_job)
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            print(f"Erro ao salvar no banco: {e}")
+
+        return {
+            "gateway_status": "SUCCESS",
+            "dispatched_to": target_url,
+            "selected_worker_id": selected_id,
+            "result": worker_data
+        }
+    finally:
+        release_lock(req.hotel_name, owner_id=job_id)

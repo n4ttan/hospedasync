@@ -13,6 +13,14 @@ services:
     networks:
       - hospeda-net
 
+  redis-lock:
+    image: redis:7-alpine
+    container_name: hospeda_redis_lock
+    ports:
+      - "6379:6379"
+    networks:
+      - hospeda-net
+
   api-gateway:
     build: ./api-gateway
     container_name: hospeda_gateway
@@ -21,8 +29,10 @@ services:
     environment:
       - WORKER_SERVICE_URL=http://worker-node:8001
       - DATABASE_URL=postgresql+psycopg2://postgres:postgrespassword@postgres-db:5432/hospedasync_db
+      - REDIS_URL=redis://redis-lock:6379/0
     depends_on:
       - postgres-db
+      - redis-lock
     networks:
       - hospeda-net
 
