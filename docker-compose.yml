@@ -27,7 +27,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - WORKER_SERVICE_URL=http://worker-node:8001
+      - WORKER_SERVICE_URL=http://worker-01:8001
       - DATABASE_URL=postgresql+psycopg2://postgres:postgrespassword@postgres-db:5432/hospedasync_db
       - REDIS_URL=redis://redis-lock:6379/0
     depends_on:
@@ -36,15 +36,49 @@ services:
     networks:
       - hospeda-net
 
-  worker-node:
+  worker-01:
     build: ./workers
-    container_name: hospeda_worker
+    container_name: hospeda_worker_01
     ports:
       - "8001:8001"
     environment:
       - GATEWAY_URL=http://api-gateway:8000
       - WORKER_ID=worker-01
       - PORT=8001
+      - SELF_URL=http://worker-01:8001
+      - PEER_WORKERS=http://worker-02:8002,http://worker-03:8003
+    depends_on:
+      - api-gateway
+    networks:
+      - hospeda-net
+
+  worker-02:
+    build: ./workers
+    container_name: hospeda_worker_02
+    ports:
+      - "8002:8002"
+    environment:
+      - GATEWAY_URL=http://api-gateway:8000
+      - WORKER_ID=worker-02
+      - PORT=8002
+      - SELF_URL=http://worker-02:8002
+      - PEER_WORKERS=http://worker-01:8001,http://worker-03:8003
+    depends_on:
+      - api-gateway
+    networks:
+      - hospeda-net
+
+  worker-03:
+    build: ./workers
+    container_name: hospeda_worker_03
+    ports:
+      - "8003:8003"
+    environment:
+      - GATEWAY_URL=http://api-gateway:8000
+      - WORKER_ID=worker-03
+      - PORT=8003
+      - SELF_URL=http://worker-03:8003
+      - PEER_WORKERS=http://worker-01:8001,http://worker-02:8002
     depends_on:
       - api-gateway
     networks:

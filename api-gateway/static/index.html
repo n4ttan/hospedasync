@@ -38,7 +38,7 @@
 
                 <div class="flex items-center gap-2 bg-[#21262d] border border-[#30363d] px-3.5 py-1.5 rounded-lg shadow-sm">
                     <span class="h-2 w-2 rounded-full bg-[#3fb950] animate-pulse"></span>
-                    <span class="text-xs text-[#c9d1d9] font-mono">Cluster: <strong class="text-[#3fb950] font-normal">Active</strong></span>
+                    <span class="text-xs text-[#c9d1d9] font-mono" id="leaderBadge">Líder: <strong class="text-[#3fb950] font-normal">verificando...</strong></span>
                 </div>
             </div>
         </div>
@@ -337,6 +337,31 @@
 
             tbody.insertBefore(row, tbody.firstChild);
         }
+
+        // Polling do líder atual (eleição Bully entre os workers)
+        const WORKER_ENDPOINTS = ['http://localhost:8001', 'http://localhost:8002', 'http://localhost:8003'];
+
+        async function pollLeader() {
+            const badge = document.getElementById('leaderBadge');
+            for (const endpoint of WORKER_ENDPOINTS) {
+                try {
+                    const res = await fetch(`${endpoint}/leader`);
+                    if (!res.ok) continue;
+                    const data = await res.json();
+                    if (data.leader_id) {
+                        const paddedId = String(data.leader_id).padStart(2, '0');
+                        badge.innerHTML = `Líder: <strong class="text-[#3fb950] font-normal">worker-${paddedId}</strong>`;
+                        return;
+                    }
+                } catch (err) {
+                    // worker fora do ar; tenta o próximo
+                }
+            }
+            badge.innerHTML = `Líder: <strong class="text-[#f85149] font-normal">indisponível</strong>`;
+        }
+
+        pollLeader();
+        setInterval(pollLeader, 5000);
     </script>
 </body>
 </html>
