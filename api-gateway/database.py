@@ -11,7 +11,9 @@ DATABASE_URL = os.getenv(
     "postgresql+psycopg2://postgres:postgrespassword@postgres-db:5432/hospedasync_db"
 )
 
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+# connect_timeout curto: com o primario fora, a leitura "strong" falha rapido (503) em vez de pendurar
+engine = create_engine(DATABASE_URL, pool_pre_ping=True,
+                       connect_args=({"connect_timeout": 5} if DATABASE_URL.startswith("postgresql") else {}))
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
