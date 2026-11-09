@@ -50,6 +50,9 @@ SUBNET_ID=$(run ec2 describe-subnets --filters Name=vpc-id,Values="$VPC_ID" Name
 # ---- Par de chaves (a chave privada so aparece uma vez; fica em KEY_FILE) ---
 if [ "$DRY_RUN" = 1 ]; then
   echo "+ aws ec2 create-key-pair --key-name $KEY_NAME --query KeyMaterial --output text > $KEY_FILE && chmod 400 $KEY_FILE" >&2
+elif aws ec2 describe-key-pairs --key-names "$KEY_NAME" >/dev/null 2>&1; then
+  echo "Par de chaves $KEY_NAME ja existe em $AWS_REGION: reutilizando (arquivo local: $KEY_FILE)" >&2
+  [ -f "$KEY_FILE" ] || { echo "ERRO: $KEY_FILE nao existe; copie a chave privada para la" >&2; exit 1; }
 else
   mkdir -p "$(dirname "$KEY_FILE")"
   aws ec2 create-key-pair --key-name "$KEY_NAME" --query KeyMaterial --output text > "$KEY_FILE"
