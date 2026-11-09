@@ -112,10 +112,12 @@
                 </div>
                 
                 <form id="dispatchForm" class="space-y-4">
-                    <div>
+                    <div class="relative">
                         <label class="block text-xs font-medium text-[#c9d1d9] mb-1.5">Hotel Concorrente</label>
-                        <input type="text" id="hotelName" required value="Hotel Palace Poços" 
+                        <input type="text" id="hotelName" required autocomplete="off" placeholder="Digite para buscar um hotel..."
                                class="w-full bg-[#21262d] border border-[#30363d] rounded-lg px-3.5 py-2 text-white text-sm focus:outline-none focus:border-[#1f6feb] transition">
+                        <p id="hotelSelected" class="hidden text-[11px] text-[#3fb950] mt-1"></p>
+                        <ul id="hotelSuggestions" class="hidden absolute z-40 left-0 right-0 mt-1 max-h-64 overflow-y-auto bg-[#161b22] border border-[#30363d] rounded-lg shadow-lg divide-y divide-[#30363d]/60"></ul>
                     </div>
 
                     <div class="grid grid-cols-2 gap-3">
@@ -147,6 +149,23 @@
                 </form>
 
                 <div id="errorBox" class="hidden bg-[#f85149]/10 border border-[#f85149]/30 text-[#f85149] p-3 rounded-lg text-xs"></div>
+
+                <div id="resultPanel" class="hidden border-t border-[#30363d] pt-4 space-y-3">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span id="resultBadge"></span>
+                        <span id="resultHotel" class="text-xs font-semibold text-white"></span>
+                    </div>
+                    <div id="persistWarn" class="hidden bg-[#9e6a03]/15 border border-[#9e6a03]/30 text-[#d29922] p-2.5 rounded-lg text-[11px]">
+                        Resultado não foi persistido no histórico (banco indisponível).
+                    </div>
+                    <table class="w-full text-left text-xs">
+                        <thead class="text-[10px] text-[#8b949e] uppercase border-b border-[#30363d]">
+                            <tr><th class="py-2 pr-2 font-semibold">OTA</th><th class="py-2 text-right font-semibold">Preço (diária)</th></tr>
+                        </thead>
+                        <tbody id="ratesBody" class="divide-y divide-[#30363d]/60"></tbody>
+                    </table>
+                    <a id="resultLink" href="#" target="_blank" rel="noopener noreferrer" class="hidden inline-block text-xs text-[#58a6ff] hover:underline">Ver no TripAdvisor &rarr;</a>
+                </div>
             </div>
 
             <!-- Analytics Chart -->
@@ -201,14 +220,137 @@
     <!-- Footer -->
     <footer class="border-t border-[#30363d] py-4 text-center text-xs text-[#8b949e]">
         HospedaSync &copy; 2026 — Arquitetura Orientada a Microsserviços
+        <p class="mt-1 text-[11px] text-[#6e7681]">Fonte dos preços: Xotelo (dados TripAdvisor) · consulta em tempo real</p>
     </footer>
 
     <!-- Script de Integração -->
     <script>
         let historyData = [];
 
+        let selectedHotel = null;   // {hotel_key, name, ...}
+        let searchTimer = null;
+        let searchSeq = 0;
+
+        const hotelInput = document.getElementById('hotelName');
+        const sugBox = document.getElementById('hotelSuggestions');
+        const selLabel = document.getElementById('hotelSelected');
+
+        function esc(v) {
+            return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        }
+        function brl(n) {
+            return 'R$ ' + Number(n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+        function fmtDate(iso) {
+            if (!iso) return '';
+            const d = new Date(iso);
+            return isNaN(d) ? String(iso) : d.toLocaleString('pt-BR');
+        }
+
         function setHotel(name) {
-            document.getElementById('hotelName').value = name;
+            hotelInput.value = name;
+            selectedHotel = null;
+            selLabel.classList.add('hidden');
+            searchHotels(name);
+        }
+
+        function chooseHotel(h) {
+            selectedHotel = h;
+            hotelInput.value = h.name;
+            sugBox.classList.add('hidden');
+            selLabel.textContent = `Selecionado: ${h.name}`;
+            selLabel.classList.remove('hidden');
+        }
+
+        async function searchHotels(q) {
+            q = (q || '').trim();
+            if (q.length < 2) { sugBox.classList.add('hidden'); return; }
+            const seq = ++searchSeq;
+            try {
+                const res = await fetch(`/hotels?q=${encodeURIComponent(q)}&limit=50`);
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const list = await res.json();
+                if (seq !== searchSeq) return;
+                sugBox.innerHTML = '';
+                if (!Array.isArray(list) || list.length === 0) {
+                    sugBox.innerHTML = '<li class="px-3.5 py-2 text-xs text-[#8b949e]">Nenhum hotel encontrado.</li>';
+                } else {
+                    list.forEach(h => {
+                        const li = document.createElement('li');
+                        li.className = 'px-3.5 py-2 cursor-pointer hover:bg-[#21262d] transition';
+                        const rating = h.rating != null ? `★ ${esc(h.rating)}` : 'sem nota';
+                        const reviews = h.review_count != null ? ` · ${Number(h.review_count).toLocaleString('pt-BR')} avaliações` : '';
+                        li.innerHTML = `<div class="text-xs text-white">${esc(h.name)}</div><div class="text-[11px] text-[#8b949e]">${rating}${reviews}</div>`;
+                        li.addEventListener('mousedown', ev => { ev.preventDefault(); chooseHotel(h); });
+                        sugBox.appendChild(li);
+                    });
+                }
+                sugBox.classList.remove('hidden');
+            } catch (err) {
+                if (seq !== searchSeq) return;
+                sugBox.innerHTML = '<li class="px-3.5 py-2 text-xs text-[#f85149]">Falha ao buscar hotéis.</li>';
+                sugBox.classList.remove('hidden');
+            }
+        }
+
+        hotelInput.addEventListener('input', () => {
+            selectedHotel = null;
+            selLabel.classList.add('hidden');
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => searchHotels(hotelInput.value), 300);
+        });
+        hotelInput.addEventListener('blur', () => setTimeout(() => sugBox.classList.add('hidden'), 150));
+
+        function showResult(data) {
+            const r = data.result;
+            const badge = document.getElementById('resultBadge');
+            if (r.source === 'live' && !r.stale) {
+                badge.innerHTML = '<span class="text-[10px] bg-[#238636]/15 text-[#3fb950] border border-[#238636]/30 font-mono px-2 py-0.5 rounded">AO VIVO</span>';
+            } else {
+                badge.innerHTML = `<span class="text-[10px] bg-[#9e6a03]/15 text-[#d29922] border border-[#9e6a03]/30 font-mono px-2 py-0.5 rounded">CACHE · dado de ${esc(fmtDate(r.fetched_at))}</span>`;
+            }
+            document.getElementById('resultHotel').textContent = r.hotel_name || '';
+            document.getElementById('persistWarn').classList.toggle('hidden', data.persisted !== false);
+            const rates = (r.rates || []).slice().sort((a, b) => a.rate - b.rate);
+            const min = rates.length ? rates[0].rate : r.min_rate;
+            document.getElementById('ratesBody').innerHTML = rates.map(x => {
+                const best = x.rate === min;
+                return `<tr><td class="py-2 pr-2 ${best ? 'text-[#3fb950] font-semibold' : 'text-[#c9d1d9]'}">${esc(x.name || x.code)}</td>` +
+                       `<td class="py-2 text-right font-mono ${best ? 'text-[#3fb950] font-semibold bg-[#238636]/10' : 'text-[#c9d1d9]'}">${brl(x.rate)}</td></tr>`;
+            }).join('');
+            const link = document.getElementById('resultLink');
+            if (r.tripadvisor_url) { link.href = r.tripadvisor_url; link.classList.remove('hidden'); }
+            else link.classList.add('hidden');
+            document.getElementById('resultPanel').classList.remove('hidden');
+        }
+
+        function toItem(r, worker, time) {
+            return {
+                job_id: r.job_id,
+                hotel: r.hotel_name || r.hotel_key,
+                price: Number(r.daily_rate ?? r.min_rate),
+                worker: worker,
+                latency: Number(r.processing_time_ms) || 0,
+                source: r.source,
+                time: time
+            };
+        }
+
+        async function loadHistory() {
+            try {
+                const res = await fetch('/history');
+                if (!res.ok) return;
+                const list = await res.json();
+                if (!Array.isArray(list)) return;
+                list.slice().reverse().forEach(r => {
+                    if (r.daily_rate == null && r.min_rate == null) return;
+                    const t = r.fetched_at ? new Date(r.fetched_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '--';
+                    historyData.push(toItem(r, r.processed_by || r.worker || '-', t));
+                    updateTable();
+                });
+                updateKPIs();
+                updateChart();
+            } catch (err) { /* histórico indisponível */ }
         }
 
         // Configuração do Gráfico Chart.js
@@ -252,10 +394,19 @@
             btn.innerHTML = `<span class="animate-pulse">Despachando ordem...</span>`;
             errBox.classList.add('hidden');
 
+            if (!selectedHotel) {
+                errBox.innerText = 'Selecione um hotel da lista de sugestões antes de disparar.';
+                errBox.classList.remove('hidden');
+                btn.disabled = false;
+                btn.innerHTML = `<span>Disparar Varredura Distribuída</span>`;
+                return;
+            }
+
             const payload = {
-                hotel_name: document.getElementById('hotelName').value,
+                hotel_key: selectedHotel.hotel_key,
                 checkin_date: document.getElementById('checkin').value,
-                checkout_date: document.getElementById('checkout').value
+                checkout_date: document.getElementById('checkout').value,
+                currency: 'BRL'
             };
 
             try {
@@ -265,18 +416,22 @@
                     body: JSON.stringify(payload)
                 });
 
-                const data = await res.json();
+                let data = {};
+                try { data = await res.json(); } catch (_) {}
 
-                if (!res.ok) throw new Error(data.detail || 'Falha ao conectar ao cluster');
+                if (!res.ok) {
+                    const msgs = {
+                        409: 'Este hotel já está sendo processado. Aguarde a conclusão e tente novamente.',
+                        404: 'Nenhuma oferta encontrada para este hotel nas datas escolhidas.',
+                        503: 'Serviço de preços temporariamente indisponível. Tente novamente em instantes.'
+                    };
+                    const detail = typeof data.detail === 'string' ? data.detail : '';
+                    throw new Error(msgs[res.status] || detail || 'Falha ao conectar ao cluster');
+                }
 
-                const item = {
-                    job_id: data.result.job_id,
-                    hotel: data.result.hotel_name,
-                    price: data.result.daily_rate,
-                    worker: data.dispatched_to,
-                    latency: data.result.processing_time_ms,
-                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-                };
+                showResult(data);
+                const item = toItem(data.result, data.dispatched_to,
+                    new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
 
                 historyData.push(item);
 
@@ -305,8 +460,8 @@
             const avgLat = latencies.reduce((a, b) => a + b, 0) / total;
 
             document.getElementById('kpiTotal').innerText = total;
-            document.getElementById('kpiAvg').innerText = `R$ ${avg.toFixed(2)}`;
-            document.getElementById('kpiMin').innerText = `R$ ${min.toFixed(2)}`;
+            document.getElementById('kpiAvg').innerText = brl(avg);
+            document.getElementById('kpiMin').innerText = brl(min);
             document.getElementById('kpiLatency').innerText = `${avgLat.toFixed(1)} ms`;
         }
 
@@ -327,10 +482,10 @@
             const row = document.createElement('tr');
             row.className = "hover:bg-[#21262d]/50 transition";
             row.innerHTML = `
-                <td class="py-3 px-4 text-[#58a6ff] font-medium">${latest.job_id}</td>
-                <td class="py-3 px-4 font-sans text-white">${latest.hotel}</td>
-                <td class="py-3 px-4 text-[#3fb950] font-semibold">R$ ${latest.price.toFixed(2)}</td>
-                <td class="py-3 px-4 text-[#8b949e]">${latest.worker}</td>
+                <td class="py-3 px-4 text-[#58a6ff] font-medium">${esc(latest.job_id)}</td>
+                <td class="py-3 px-4 font-sans text-white">${esc(latest.hotel)}${latest.source ? ` <span class="ml-1 text-[10px] font-mono ${latest.source === 'live' ? 'text-[#3fb950]' : 'text-[#d29922]'}">${latest.source === 'live' ? 'AO VIVO' : 'CACHE'}</span>` : ''}</td>
+                <td class="py-3 px-4 text-[#3fb950] font-semibold">${brl(latest.price)}</td>
+                <td class="py-3 px-4 text-[#8b949e]">${esc(latest.worker)}</td>
                 <td class="py-3 px-4 text-[#d29922]">${latest.latency} ms</td>
                 <td class="py-3 px-4 text-[#6e7681]">${latest.time}</td>
             `;
@@ -360,6 +515,7 @@
             badge.innerHTML = `Líder: <strong class="text-[#f85149] font-normal">indisponível</strong>`;
         }
 
+        loadHistory();
         pollLeader();
         setInterval(pollLeader, 5000);
     </script>
