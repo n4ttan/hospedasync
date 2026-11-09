@@ -13,6 +13,7 @@ broker reentrega a outro worker. Por isso a gravacao dos resultados e idempotent
 import asyncio
 import json
 import os
+from urllib.parse import urlsplit
 
 import aio_pika
 
@@ -25,6 +26,15 @@ DLX_EXCHANGE = "hospeda.dlx"
 EVENTS_EXCHANGE = "hospeda.cluster.events"
 
 
+def safe_url(url: str) -> str:
+    """URL sem usuario e senha, segura para log e mensagem de erro."""
+    try:
+        p = urlsplit(url)
+        return f"{p.scheme}://{p.hostname}:{p.port}{p.path}" if p.port else f"{p.scheme}://{p.hostname}{p.path}"
+    except Exception:
+        return "<url invalida>"
+
+
 async def connect(url: str = None, retries: int = 30, delay: float = 2.0):
     """Conexao robusta (reconecta sozinha). Tenta ate `retries` vezes na subida, pois o broker pode demorar."""
     url = url or RABBITMQ_URL
@@ -35,7 +45,7 @@ async def connect(url: str = None, retries: int = 30, delay: float = 2.0):
         except Exception as exc:  # broker ainda subindo
             last = exc
             await asyncio.sleep(delay)
-    raise ConnectionError(f"RabbitMQ indisponivel em {url}: {last}")
+    raise ConnectionError(f"RabbitMQ indisponivel em {safe_url(url)}: {type(last).__name__}")
 
 
 async def declare_topology(channel) -> dict:
