@@ -14,9 +14,10 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
-from database import Base, SessionLocal
+from database import Base, SessionLocal, ReplicaSessionLocal
 import servicetoken
 
 log = logging.getLogger("auth")
@@ -116,6 +117,19 @@ class CreateUserRequest(BaseModel):
 
 
 # ---------- dependencias ----------
+def _user_from_replica(username: str):
+    """Leitura do usuario na replica quando o primario esta indisponivel; sem replica, 503 (nao 500)."""
+    if ReplicaSessionLocal is None:
+        raise HTTPException(503, "Banco indisponivel")
+    rdb = ReplicaSessionLocal()
+    try:
+        return rdb.query(User).filter(User.username == username).first()
+    except DBAPIError:
+        raise HTTPException(503, "Banco indisponivel")
+    finally:
+        rdb.close()
+
+
 def current_user(creds: HTTPAuthorizationCredentials = Depends(_bearer),
                  db: Session = Depends(get_session)) -> User:
     bad = HTTPException(401, "Nao autenticado", headers={"WWW-Authenticate": "Bearer"})
@@ -126,7 +140,10 @@ def current_user(creds: HTTPAuthorizationCredentials = Depends(_bearer),
                             options={"require": ["exp", "sub", "iat", "jti"]})
     except jwt.PyJWTError:
         raise bad
-    user = db.query(User).filter(User.username == claims["sub"]).first()
+    try:
+        user = db.query(User).filter(User.username == claims["sub"]).first()
+    except DBAPIError:
+        user = _user_from_replica(claims["sub"])  # primario fora: autentica pela replica (somente leitura)
     if user is None or user.disabled:
         raise bad
     return user  # papel vem do banco, nao do token (revogacao de papel vale na hora)

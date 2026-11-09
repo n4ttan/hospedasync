@@ -237,11 +237,11 @@ CAP e PACELC: padrão PA/EL (replica assíncrona, escrita rápida), com PC/EC na
 | Nginx | Gateway | HTTP | JSON | Repassa o cabeçalho `Authorization` |
 | Cliente | Gateway (rotas protegidas) | HTTP/REST | JSON | JWT HS256 no `Authorization: Bearer`; papel `analyst` ou `admin` |
 | Cliente | `POST /auth/login` | HTTP/REST | JSON | Usuário e senha (Argon2); 5 falhas por minuto bloqueiam |
-| Gateway | Worker `POST /scrape` | HTTP/REST (httpx, timeout 15 s) | JSON + cabeçalho `X-Lamport` | **Nenhuma** (rede interna) |
+| Gateway | Worker `POST /scrape` | HTTP/REST (httpx, timeout 50 s) | JSON + cabeçalho `X-Lamport` | HMAC-SHA256 por requisição (id, método, caminho, timestamp; janela de 60 s) |
 | Worker (líder) | Gateway `GET /internal/hotels` | HTTP/REST a cada varredura | JSON | HMAC-SHA256 (mesmos cabeçalhos), recurso `internal:hotels` |
 | Worker | Gateway `POST /registry/register` | HTTP/REST a cada 5 s | JSON | HMAC-SHA256 em `X-Service-Id`, `X-Timestamp`, `X-Service-Signature` com `SERVICE_SECRET`, janela de 60 s |
-| Worker | Worker `/election`, `/coordinator`, `/health`, `/leader`, `/events` | HTTP/REST | JSON com campo `lamport` | **Nenhuma** (rede interna) |
-| Gateway | Worker `/leader`, `/events` (diagnóstico) | HTTP/REST (timeout 1,5 s) | JSON | **Nenhuma** |
+| Worker | Worker `/election`, `/coordinator`, `/health`, `/leader`, `/events` | HTTP/REST | JSON com campo `lamport` | HMAC-SHA256 por requisição (`/health` é público) |
+| Gateway | Worker `/leader`, `/events` (diagnóstico) | HTTP/REST (timeout 1,5 s) | JSON | HMAC-SHA256 por requisição |
 | Gateway / Worker | RabbitMQ | AMQP 0-9-1 (aio-pika) | JSON, mensagens persistentes | Usuário e senha do broker (`RABBITMQ_URL`) |
 | Worker (líder) | Todos os workers | AMQP fanout `hospeda.cluster.events` | JSON (`type`, `node`, `lamport`) | Idem broker |
 | Gateway / Worker | Redis | RESP | chave `lock:hospedasync:<hotel_key>`, `sweep:<id>` | `requirepass` (`REDIS_PASSWORD`) |
@@ -276,7 +276,7 @@ Observação: TLS cobre apenas a borda. O tráfego interno (HTTP, AMQP, RESP, SQ
 | Segredos | `.env` gerado, fora do git; Redis, RabbitMQ e Postgres com senha | `scripts/gen_env.sh`, `docker-compose.yml` |
 | Rede | Portas internas ligadas a `127.0.0.1` | `docker-compose.yml` |
 
-Lacunas declaradas: sem TLS interno nem mTLS; rotas de eleição e `/scrape` sem autenticação; segredo JWT único; sem revogação individual de token.
+Lacunas declaradas: sem TLS interno nem mTLS (o canal interno é HTTP com assinatura HMAC; o MAC não cobre o corpo); segredo JWT único; sem revogação individual de token.
 
 ## 10. Limitações da arquitetura
 

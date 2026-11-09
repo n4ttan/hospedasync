@@ -94,7 +94,7 @@ Convenção dos comandos: `GW=http://localhost:8000`; os `curl` autenticados usa
 | Matriz de requisitos | este arquivo | Atendido |
 | Roteiro de demonstração | `docs/relatorio/roteiro-apresentacao.md` | Atendido |
 | Testes e resultados | `tests/` (cerca de 111 funções de teste), `docs/felipe/resultados_consistencia.md`, `docs/relatorio/evidencias/chaos_<data>.md` (gerado por `scripts/chaos_demo.sh`) | Parcial: evidências do caos dependem da execução do script |
-| Implantação AWS multi-instância | Nenhum arquivo (sem Terraform, sem templates) | **Pendente**: a versão atual não foi implantada na AWS. O README anterior registrava uma EC2 t3.micro com a versão inicial (gateway e um worker) |
+| Implantação AWS multi-instância | `deploy/aws/` (compose por instância, `provision.sh`, `user-data.sh`) | **Atendido e verificado em 09/11/2026**: 3 EC2 (edge, workers-a, workers-b); evidências em `docs/relatorio/evidencias/aws_demo_2026-11-09.md` e `chaos_aws_2026-11-09.md` (caos: 5 de 6 PASS, o 6 pendente de repetição) |
 
 ## 10. Quadro de seleção de tecnologias
 
@@ -121,7 +121,7 @@ Convenção dos comandos: `GW=http://localhost:8000`; os `curl` autenticados usa
 3. Redis e RabbitMQ em instância única.
 4. PostgreSQL sem failover automático.
 5. Bully sem quórum; a eleição não influencia o roteamento do dispatch.
-6. HMAC cobre só o registro de workers e `/internal/hotels`; `/scrape` e rotas de eleição sem autenticação; tráfego interno sem TLS.
+6. O HMAC cobre toda chamada interna (registro, `/internal/hotels`, `/scrape`, eleição), mas o MAC não inclui o corpo e o tráfego interno é HTTP sem TLS.
 7. Gateway em instância única; registry em memória.
 8. Relógio físico sem sincronização própria; Lamport não detecta concorrência.
 9. gRPC não implementado (REST atende o requisito).

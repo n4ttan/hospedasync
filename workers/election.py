@@ -211,13 +211,37 @@ async def initial_election_delay():
     await start_election()
 
 
+async def _higher_peer_alive() -> bool:
+    for pid, url in PEERS.items():
+        if pid <= MY_ID:
+            continue
+        try:
+            async with httpx.AsyncClient(timeout=ELECTION_TIMEOUT) as client:
+                if (await client.get(f"{url}/health")).status_code == 200:
+                    return True
+        except Exception:
+            continue
+    return False
+
+
 async def monitor_leader():
     consecutive_failures = 0
     while True:
         await asyncio.sleep(HEARTBEAT_INTERVAL)
 
-        if CURRENT_LEADER_ID is None or CURRENT_LEADER_ID == MY_ID:
+        if CURRENT_LEADER_ID is None:
+            # sem lider (ex.: /coordinator perdido): nao fica para sempre sem coordenacao
             consecutive_failures = 0
+            EVENTS.log("no_leader_known")
+            asyncio.create_task(start_election())
+            continue
+
+        if CURRENT_LEADER_ID == MY_ID:
+            consecutive_failures = 0
+            # Bully: se um ID MAIOR esta vivo (ex.: cura de particao), ele deve assumir; re-elege.
+            if await _higher_peer_alive():
+                EVENTS.log("higher_peer_alive_reelect")
+                asyncio.create_task(start_election())
             continue
 
         leader_url = PEERS.get(CURRENT_LEADER_ID)

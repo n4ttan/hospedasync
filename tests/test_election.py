@@ -253,3 +253,24 @@ def test_become_leader_runs_hooks_and_logs(el, monkeypatch):
     assert all("lamport" in body for _, body in posts)
     assert el.CLOCK.time > 999
     assert "became_leader" in [e["type"] for e in el.EVENTS.snapshot()]
+
+
+def test_lider_com_id_menor_reelege_se_id_maior_esta_vivo(monkeypatch):
+    import asyncio
+    import election
+
+    class R:
+        status_code = 200
+
+    class C:
+        def __init__(self, *a, **k): pass
+        async def __aenter__(self): return self
+        async def __aexit__(self, *a): return False
+        async def get(self, url): return R()
+
+    monkeypatch.setattr(election, "MY_ID", 1)
+    monkeypatch.setattr(election, "PEERS", {3: "http://w3"})
+    monkeypatch.setattr(election.httpx, "AsyncClient", C)
+    assert asyncio.run(election._higher_peer_alive()) is True
+    monkeypatch.setattr(election, "PEERS", {0: "http://w0"})
+    assert asyncio.run(election._higher_peer_alive()) is False

@@ -160,3 +160,18 @@ def test_hmac_unit(secret):
     assert not servicetoken.verify("", h, "w1", "e")
     h2 = dict(h); h2["X-Service-Signature"] = "0" * 64
     assert not servicetoken.verify(secret, h2, "w1", "e")
+
+
+def test_primario_fora_autentica_pela_replica(monkeypatch):
+    """Primario indisponivel: current_user cai para a replica; sem replica responde 503."""
+    import auth
+    from fastapi import HTTPException
+    from sqlalchemy.exc import OperationalError
+
+    monkeypatch.setattr(auth, "ReplicaSessionLocal", None)
+    try:
+        auth._user_from_replica("admin")
+        assert False, "deveria levantar 503"
+    except HTTPException as exc:
+        assert exc.status_code == 503
+    assert issubclass(OperationalError, auth.DBAPIError)

@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends, Response, Query, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
+from sqlalchemy.exc import DBAPIError
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 import httpx
@@ -26,7 +27,17 @@ from sweeps import EVENTS, router as sweeps_router
 from hotels import seed_if_empty, refresh_from_xotelo
 from distlock import acquire_lock, release_lock, is_locked, check_connection, list_locks
 
+# Pior caso do worker: 3 tentativas x 15 s na fonte + backoff (~47 s). O timeout do gateway deve cobri-lo e o
+# TTL do lock deve ser maior que o timeout, senao o lock expira com a requisicao ainda em curso.
+WORKER_TIMEOUT_SECONDS = 50.0
+LOCK_TTL_SECONDS = 60
 app = FastAPI(title="HospedaSync API Gateway", version="1.0.0")
+
+
+@app.exception_handler(DBAPIError)
+async def _db_unavailable(request, exc):
+    """Banco primario fora do ar: 503 explicito em vez de 500 generico."""
+    return JSONResponse(status_code=503, content={"detail": "Banco indisponivel"})
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
@@ -400,7 +411,7 @@ async def dispatch_job(req: TriggerJobRequest, db: Session = Depends(get_db)):
     }
 
     # Exclusao mutua por hotel_key; owner_id = job_id (so quem adquiriu libera).
-    if not acquire_lock(hotel_key, owner_id=job_id, ttl=30):
+    if not acquire_lock(hotel_key, owner_id=job_id, ttl=LOCK_TTL_SECONDS):
         EVENTS.log("lock_conflict", job_id=job_id, hotel_key=hotel_key)
         METRICS["dispatch_conflict_total"] += 1
         raise HTTPException(
@@ -420,11 +431,12 @@ async def dispatch_job(req: TriggerJobRequest, db: Session = Depends(get_db)):
                 continue
             try:
                 sent = EVENTS.log("dispatch_sent", job_id=job_id, hotel_key=hotel_key, worker=selected_id)
-                async with httpx.AsyncClient(timeout=15.0) as client:
+                async with httpx.AsyncClient(timeout=WORKER_TIMEOUT_SECONDS) as client:
                     response = await client.post(f"{target_url}/scrape", json=payload,
                                                  headers=_peer_headers("POST", "/scrape", {"X-Lamport": str(sent["lamport"])}))
             except httpx.RequestError as exc:
-                breaker.record_failure()
+                if not isinstance(exc, httpx.ReadTimeout):  # worker lento mas vivo nao abre o breaker
+                    breaker.record_failure()
                 failure = (503, f"Falha ao conectar ao Worker ({target_url}): {str(exc)}")
                 EVENTS.log("dispatch_failover", job_id=job_id, worker=selected_id, reason="connect_error")
                 METRICS["dispatch_failover_total"] += 1
