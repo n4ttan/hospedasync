@@ -1,10 +1,8 @@
 # Implantação distribuída na AWS (3 instâncias EC2)
 
-> **Aviso honesto:** esta implantação **ainda NÃO foi testada na AWS**. Os arquivos foram validados apenas
-> localmente (`docker compose config -q`, `bash -n`, `DRY_RUN=1`). Espere ajustes no primeiro uso.
-> O plano gratuito pode restringir tipos de instância (por exemplo, apenas alguns `t3`/`t4g`): teste `t3.small`
-> (2 GiB) e, se não for permitido, veja a lista de tipos elegíveis no console. `t3.micro` (1 GiB) tende a faltar
-> memória para o build das imagens e para o Postgres + 2 workers; o `user-data.sh` cria 1 GiB de swap para ajudar.
+> **Estado:** implantação executada e verificada na AWS em 09/11/2026 (3 EC2 `t3.small`, us-east-1): `/health`, 3 nós, consenso de líder,
+> portas internas fechadas, demo de coordenação e caos 6 de 6 (`docs/relatorio/evidencias/`). Ajustes aprendidos no uso: `provision.sh` é repetível
+> (reusa SGs, regras e par de chaves; imagem via `describe-images`, sem permissão no SSM). A rede instável do operador exige `AWS_MAX_ATTEMPTS`/retries.
 
 ## Topologia
 
