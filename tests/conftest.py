@@ -29,3 +29,35 @@ def clean_locks(distlock_mod):
     wipe()
     yield distlock_mod
     wipe()
+
+
+# --- Autenticacao nos testes do Gateway -------------------------------------
+# Producao exige JWT e assinatura HMAC; nos testes de rota (nao nos de auth) o gateway
+# roda com um usuario admin fixo via dependency_overrides, sem nenhum bypass no codigo.
+os.environ.setdefault("SERVICE_SECRET", "test-service-secret")
+
+
+def signed_headers(worker_id: str, endpoint: str) -> dict:
+    import servicetoken
+    return servicetoken.sign(os.environ["SERVICE_SECRET"], worker_id, endpoint)
+
+
+def _install_gateway_auth_override():
+    import fastapi
+
+    import auth
+
+    original_init = fastapi.FastAPI.__init__
+
+    class _FakeAdmin:
+        id, username, role, disabled = 0, "test-admin", "admin", False
+
+    def patched(self, *a, **kw):
+        original_init(self, *a, **kw)
+        if kw.get("title") == "HospedaSync API Gateway":
+            self.dependency_overrides[auth.current_user] = lambda: _FakeAdmin()
+
+    fastapi.FastAPI.__init__ = patched
+
+
+_install_gateway_auth_override()

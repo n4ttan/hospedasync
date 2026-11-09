@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, Response, Query
+from fastapi import FastAPI, HTTPException, Depends, Response, Query, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -17,7 +17,10 @@ from pathlib import Path
 from database import (init_db, SessionLocal, JobHistory, Hotel, get_db, get_read_db,
                       replica_lag_ms, consistency_status)
 from lamport import merge_events
+from resilience import CircuitBreaker
 import sweeps
+import auth
+from auth import router as auth_router, require_role, check_service_headers
 from sweeps import EVENTS, router as sweeps_router
 from hotels import seed_if_empty, refresh_from_xotelo
 from distlock import acquire_lock, release_lock, is_locked, check_connection, list_locks
@@ -30,7 +33,11 @@ STATIC_DIR = BASE_DIR / "static"
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
-app.include_router(sweeps_router)
+ANALYST = [Depends(require_role("analyst"))]
+ADMIN = [Depends(require_role("admin"))]
+
+app.include_router(auth_router)
+app.include_router(sweeps_router, dependencies=ANALYST)
 
 ACTIVE_WORKERS = {}
 
@@ -55,6 +62,7 @@ async def startup_event():
         init_db()
         db = SessionLocal()
         try:
+            auth.seed_admin(db)
             seed_if_empty(db)
         finally:
             db.close()
@@ -71,6 +79,32 @@ async def shutdown_event():
             await _consumer_task
         except BaseException:
             pass
+
+MAX_DISPATCH_ATTEMPTS = int(os.getenv("MAX_DISPATCH_ATTEMPTS", "3"))
+_BREAKERS = {}
+METRICS = {"dispatch_total": 0, "dispatch_ok_total": 0, "dispatch_degraded_total": 0,
+           "dispatch_conflict_total": 0, "dispatch_failover_total": 0}
+
+
+def _breaker(worker_id: str) -> CircuitBreaker:
+    b = _BREAKERS.get(worker_id)
+    if b is None:
+        b = _BREAKERS[worker_id] = CircuitBreaker(f"worker:{worker_id}", failure_threshold=3, recovery_timeout=20)
+    return b
+
+
+@app.get("/metrics", dependencies=ADMIN)
+def metrics():
+    """Metricas no formato texto do Prometheus (admin). Contadores do dispatch, workers ativos e circuitos."""
+    now = time.time()
+    active = sum(1 for v in ACTIVE_WORKERS.values() if now - v["last_seen"] < 15)
+    lines = [f"hospeda_{k} {v}" for k, v in METRICS.items()]
+    lines.append(f"hospeda_workers_active {active}")
+    for wid, b in _BREAKERS.items():
+        state = {"closed": 0, "half_open": 1, "open": 2}.get(b.state, -1)
+        lines.append(f'hospeda_worker_breaker_state{{worker="{wid}"}} {state}')
+    return Response("\n".join(lines) + "\n", media_type="text/plain; version=0.0.4")
+
 
 @app.get("/")
 async def read_index():
@@ -90,12 +124,12 @@ def health():
         "rabbitmq": "UP" if sweeps.consumer_connected() else "DOWN",
     }
 
-@app.get("/locks/{hotel_name}")
+@app.get("/locks/{hotel_name}", dependencies=ADMIN)
 def get_lock_status(hotel_name: str):
     """Endpoint de diagnostico: informa se o hotel esta com lock ativo."""
     return {"hotel_name": hotel_name, "locked": is_locked(hotel_name)}
 
-@app.get("/locks")
+@app.get("/locks", dependencies=ADMIN)
 def get_active_locks():
     """Diagnostico: todos os locks de hotel atualmente ativos no Redis."""
     try:
@@ -103,7 +137,7 @@ def get_active_locks():
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"Redis indisponivel: {exc}")
 
-@app.get("/coordination/status")
+@app.get("/coordination/status", dependencies=ADMIN)
 async def coordination_status():
     """
     Visao de coordenacao do cluster: pergunta a cada worker registrado quem ele
@@ -135,7 +169,7 @@ async def coordination_status():
         "active_locks": locks,
     }
 
-@app.get("/coordination/events")
+@app.get("/coordination/events", dependencies=ADMIN)
 async def coordination_events(limit: int = 100):
     """Eventos de todos os nos (workers ativos + gateway) fundidos em ordem de Lamport."""
     limit = max(1, min(limit, 1000))
@@ -161,14 +195,16 @@ async def coordination_events(limit: int = 100):
     return {"events": merged[-limit:], "nodes_reached": reached, "nodes_failed": failed}
 
 @app.post("/registry/register")
-def register_worker(req: RegisterWorkerRequest):
+def register_worker(req: RegisterWorkerRequest, request: Request):
+    # Somente nos com assinatura HMAC valida entram no registry (impede no falso).
+    check_service_headers(request.headers, req.worker_id, req.endpoint)
     ACTIVE_WORKERS[req.worker_id] = {
         "endpoint": req.endpoint,
         "last_seen": time.time()
     }
     return {"status": "REGISTERED", "worker_id": req.worker_id}
 
-@app.get("/registry/nodes")
+@app.get("/registry/nodes", dependencies=ANALYST)
 def get_registered_nodes():
     """Retorna os nós ativos registrados no Service Registry em tempo real (para a apresentação do Rafael)"""
     now = time.time()
@@ -214,7 +250,7 @@ def _hotel_to_dict(h: Hotel) -> dict:
         "hotel_key", "name", "location_key", "rating", "review_count",
         "latitude", "longitude", "tripadvisor_url", "accommodation_type")}
 
-@app.get("/hotels")
+@app.get("/hotels", dependencies=ANALYST)
 def list_hotels(q: str = "", limit: int = 50, db: Session = Depends(get_db)):
     """Busca hoteis do catalogo por nome, ordenados por numero de avaliacoes."""
     limit = max(1, min(limit, 500))
@@ -224,7 +260,7 @@ def list_hotels(q: str = "", limit: int = 50, db: Session = Depends(get_db)):
     rows = query.order_by(Hotel.review_count.desc().nullslast()).limit(limit).all()
     return [_hotel_to_dict(h) for h in rows]
 
-@app.post("/hotels/refresh")
+@app.post("/hotels/refresh", dependencies=ADMIN)
 def refresh_hotels(db: Session = Depends(get_db)):
     """Atualiza o catalogo a partir da API Xotelo (mantem o existente em caso de falha)."""
     result = refresh_from_xotelo(db)
@@ -232,7 +268,7 @@ def refresh_hotels(db: Session = Depends(get_db)):
         raise HTTPException(status_code=502, detail=result)
     return result
 
-@app.get("/history")
+@app.get("/history", dependencies=ANALYST)
 def get_history(response: Response, consistency: str = Query("strong", pattern="^(strong|eventual)$"),
                 pdb: Session = Depends(get_db)):
     """Historico persistido. strong (padrao) le do primario; eventual le da replica
@@ -264,7 +300,7 @@ def get_history(response: Response, consistency: str = Query("strong", pattern="
             db.close()
 
 
-@app.get("/consistency/status")
+@app.get("/consistency/status", dependencies=ANALYST)
 def get_consistency_status():
     """Estado da replicacao: lag (ms e bytes), modo sincrono e alcancabilidade da replica."""
     return consistency_status()
@@ -318,21 +354,22 @@ def _cached_quote(db, hotel_key, checkin, checkout):
         pass
     return d
 
-@app.post("/jobs/dispatch")
+@app.post("/jobs/dispatch", dependencies=ANALYST)
 async def dispatch_job(req: TriggerJobRequest, db: Session = Depends(get_db)):
     hotel_key, hotel_name = _resolve_hotel(db, req)
     currency = req.currency or "BRL"
+    METRICS["dispatch_total"] += 1
 
     now = time.time()
     valid_workers = {k: v for k, v in ACTIVE_WORKERS.items() if now - v["last_seen"] < 15}
     default_worker_url = os.getenv("WORKER_SERVICE_URL", "http://worker-node:8001")
 
     if valid_workers:
-        selected_id, node_info = random.choice(list(valid_workers.items()))
-        target_url = node_info["endpoint"]
+        candidates = [(k, v["endpoint"]) for k, v in valid_workers.items()]
+        random.shuffle(candidates)
     else:
-        selected_id = "default-worker"
-        target_url = default_worker_url
+        candidates = [("default-worker", default_worker_url)]
+    selected_id, target_url = candidates[0]
 
     job_id = f"job-{uuid.uuid4().hex[:8]}"
     payload = {
@@ -347,6 +384,7 @@ async def dispatch_job(req: TriggerJobRequest, db: Session = Depends(get_db)):
     # Exclusao mutua por hotel_key; owner_id = job_id (so quem adquiriu libera).
     if not acquire_lock(hotel_key, owner_id=job_id, ttl=30):
         EVENTS.log("lock_conflict", job_id=job_id, hotel_key=hotel_key)
+        METRICS["dispatch_conflict_total"] += 1
         raise HTTPException(
             status_code=409,
             detail=f"O hotel '{hotel_name}' ja esta sendo processado por outra requisicao. Tente novamente em instantes."
@@ -354,14 +392,33 @@ async def dispatch_job(req: TriggerJobRequest, db: Session = Depends(get_db)):
 
     try:
         worker_data = None
-        failure = None  # (status, detail) quando o worker esta indisponivel
-        try:
-            sent = EVENTS.log("dispatch_sent", job_id=job_id, hotel_key=hotel_key, worker=selected_id)
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                response = await client.post(f"{target_url}/scrape", json=payload,
-                                             headers={"X-Lamport": str(sent["lamport"])})
+        failure = None  # (status, detail) quando nenhum worker respondeu
+        # Failover: tenta ate MAX_DISPATCH_ATTEMPTS workers; cada um com seu circuit breaker.
+        for selected_id, target_url in candidates[:MAX_DISPATCH_ATTEMPTS]:
+            breaker = _breaker(selected_id)
+            if not breaker.allow():
+                failure = (503, f"Worker {selected_id} com circuito aberto.")
+                EVENTS.log("dispatch_skipped_breaker_open", job_id=job_id, worker=selected_id)
+                continue
+            try:
+                sent = EVENTS.log("dispatch_sent", job_id=job_id, hotel_key=hotel_key, worker=selected_id)
+                async with httpx.AsyncClient(timeout=15.0) as client:
+                    response = await client.post(f"{target_url}/scrape", json=payload,
+                                                 headers={"X-Lamport": str(sent["lamport"])})
+            except httpx.RequestError as exc:
+                breaker.record_failure()
+                failure = (503, f"Falha ao conectar ao Worker ({target_url}): {str(exc)}")
+                EVENTS.log("dispatch_failover", job_id=job_id, worker=selected_id, reason="connect_error")
+                METRICS["dispatch_failover_total"] += 1
+                continue
             EVENTS.log("dispatch_done", received=response.headers.get("X-Lamport"),
                        job_id=job_id, worker=selected_id, http_status=response.status_code)
+            if response.status_code in (502, 503):
+                # 502/503 do worker = fonte de precos fora; tentar outro worker nao ajuda, mas conta para o breaker
+                breaker.record_failure()
+                failure = (503, f"Worker indisponivel ou fonte de precos fora do ar (HTTP {response.status_code}).")
+                break
+            breaker.record_success()
             if response.status_code == 200:
                 worker_data = response.json()
             elif response.status_code == 404:
@@ -370,17 +427,18 @@ async def dispatch_job(req: TriggerJobRequest, db: Session = Depends(get_db)):
                 except Exception:
                     detail = {"error": "no_rates"}
                 raise HTTPException(status_code=404, detail=detail)
-            elif response.status_code in (502, 503):
-                failure = (503, f"Worker indisponivel ou fonte de precos fora do ar (HTTP {response.status_code}).")
             else:
                 raise HTTPException(status_code=502, detail="Erro retornado pelo no worker.")
-        except httpx.RequestError as exc:
-            failure = (503, f"Falha ao conectar ao Worker ({target_url}): {str(exc)}")
+            break
+        else:
+            if failure is None:
+                failure = (503, "Nenhum worker disponivel.")
 
         if worker_data is None:
             cached = _cached_quote(db, hotel_key, req.checkin_date, req.checkout_date)
             if cached is None:
                 raise HTTPException(status_code=failure[0], detail=failure[1])
+            METRICS["dispatch_degraded_total"] += 1
             return {
                 "gateway_status": "DEGRADED",
                 "dispatched_to": target_url,
@@ -419,6 +477,7 @@ async def dispatch_job(req: TriggerJobRequest, db: Session = Depends(get_db)):
                 pass
             print(f"Erro ao salvar no banco: {e}")
 
+        METRICS["dispatch_ok_total"] += 1
         return {
             "gateway_status": "SUCCESS" if persisted else "DEGRADED",
             "dispatched_to": target_url,

@@ -1,3 +1,4 @@
+from conftest import signed_headers
 import importlib.util
 from pathlib import Path
 
@@ -47,7 +48,7 @@ def test_events_merged_by_lamport_and_failures(gw, monkeypatch):
                         lambda *a, **kw: RealAsyncClient(*a, transport=httpx.MockTransport(handler), **kw))
     with TestClient(gw.app) as c:
         for w in ("w1", "w2", "w3"):
-            c.post("/registry/register", json={"worker_id": w, "endpoint": f"http://{w}"})
+            c.post("/registry/register", json={"worker_id": w, "endpoint": f"http://{w}"}, headers=signed_headers(w, f"http://{w}"))
         r = c.get("/coordination/events").json()
         limited = c.get("/coordination/events?limit=2").json()
     assert [(e["lamport"], e["node"]) for e in r["events"]] == [

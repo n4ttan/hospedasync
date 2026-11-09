@@ -40,7 +40,7 @@ def setup(monkeypatch):
 
     main.app.dependency_overrides[main.get_db] = _get_db
     yield main, primary, replica
-    main.app.dependency_overrides.clear()
+    main.app.dependency_overrides.pop(main.get_db, None)  # preserva o override de auth do conftest
 
 
 def _ids(r):

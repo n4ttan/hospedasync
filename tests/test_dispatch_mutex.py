@@ -1,3 +1,4 @@
+from conftest import signed_headers
 import asyncio
 import importlib.util
 import threading
@@ -127,7 +128,7 @@ def test_locks_endpoint_shows_active_lock(gw, monkeypatch):
 
 def test_registry_and_nodes(gw):
     with TestClient(gw.app) as c:
-        r = c.post("/registry/register", json={"worker_id": "w1", "endpoint": "http://w1:8001"})
+        r = c.post("/registry/register", json={"worker_id": "w1", "endpoint": "http://w1:8001"}, headers=signed_headers("w1", "http://w1:8001"))
         assert r.json()["status"] == "REGISTERED"
         n = c.get("/registry/nodes").json()
         assert n["count"] == 1 and "w1" in n["active_nodes"]
@@ -141,7 +142,7 @@ def test_coordination_status_consensus(gw, monkeypatch):
                         lambda *a, **kw: RealAsyncClient(*a, transport=httpx.MockTransport(handler), **kw))
     with TestClient(gw.app) as c:
         for w in ("w1", "w2"):
-            c.post("/registry/register", json={"worker_id": w, "endpoint": f"http://{w}"})
+            c.post("/registry/register", json={"worker_id": w, "endpoint": f"http://{w}"}, headers=signed_headers(w, f"http://{w}"))
         s = c.get("/coordination/status").json()
     assert s["consensus"] is True and s["leader_id"] == 3
     assert s["active_locks"] == []
@@ -155,6 +156,6 @@ def test_coordination_status_split_view(gw, monkeypatch):
                         lambda *a, **kw: RealAsyncClient(*a, transport=httpx.MockTransport(handler), **kw))
     with TestClient(gw.app) as c:
         for w in ("w1", "w2"):
-            c.post("/registry/register", json={"worker_id": w, "endpoint": f"http://{w}"})
+            c.post("/registry/register", json={"worker_id": w, "endpoint": f"http://{w}"}, headers=signed_headers(w, f"http://{w}"))
         s = c.get("/coordination/status").json()
     assert s["consensus"] is False and s["leader_id"] is None
