@@ -3,6 +3,7 @@
 # Uso: bash scripts/demo_coordenacao.sh   (precisa de docker compose e curl)
 set -u
 GW=${GATEWAY_URL:-http://localhost:8000}
+source "$(dirname "$0")/_auth.sh"
 DEMO_HOTEL="Hotel Copacabana Palace"
 body() { printf '{"hotel_name":"%s","checkin_date":"2026-12-20","checkout_date":"2026-12-23"}' "$1"; }
 leader() { curl -s "$GW/coordination/status" | python3 -c 'import sys,json; d=json.load(sys.stdin); print("lider=%s consenso=%s visoes=%s" % (d["leader_id"], d["consensus"], d["worker_views"]))'; }

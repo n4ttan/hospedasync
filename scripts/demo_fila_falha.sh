@@ -3,6 +3,7 @@
 # Uso: bash scripts/demo_fila_falha.sh   (cluster ja no ar: docker compose up --build -d)
 set -u
 GW=${GATEWAY_URL:-http://localhost:8000}
+source "$(dirname "$0")/_auth.sh"
 lider() { curl -s "$GW/coordination/status" | python3 -c 'import sys,json; d=json.load(sys.stdin); print("lider=%s consenso=%s visoes=%s" % (d["leader_id"], d["consensus"], d["worker_views"]))'; }
 
 echo "== 1. Estado inicial"; lider
