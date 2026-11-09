@@ -7,7 +7,8 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 os.environ.setdefault("REDIS_URL", "redis://localhost:6380/0")
 os.environ.setdefault("DATABASE_URL", "sqlite://")
-sys.path.insert(0, str(ROOT / "api-gateway"))  # distlock, database (nao colide com workers/main.py)
+sys.path.insert(0, str(ROOT / "api-gateway"))  # database (nao colide com workers/main.py)
+sys.path.insert(0, str(ROOT / "shared"))  # distlock, lamport, mq
 
 
 @pytest.fixture(scope="session")

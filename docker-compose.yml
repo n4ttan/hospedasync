@@ -21,8 +21,27 @@ services:
     networks:
       - hospeda-net
 
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: hospeda_rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-hospeda}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-hospeda-mq-pass}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    networks:
+      - hospeda-net
+
   api-gateway:
-    build: ./api-gateway
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
     container_name: hospeda_gateway
     ports:
       - "8000:8000"
@@ -30,14 +49,18 @@ services:
       - WORKER_SERVICE_URL=http://worker-01:8001
       - DATABASE_URL=postgresql+psycopg2://postgres:postgrespassword@postgres-db:5432/hospedasync_db
       - REDIS_URL=redis://redis-lock:6379/0
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-hospeda}:${RABBITMQ_PASS:-hospeda-mq-pass}@rabbitmq:5672/
     depends_on:
       - postgres-db
       - redis-lock
+      - rabbitmq
     networks:
       - hospeda-net
 
   worker-01:
-    build: ./workers
+    build:
+      context: .
+      dockerfile: workers/Dockerfile
     container_name: hospeda_worker_01
     ports:
       - "8001:8001"
@@ -47,13 +70,20 @@ services:
       - PORT=8001
       - SELF_URL=http://worker-01:8001
       - PEER_WORKERS=http://worker-02:8002,http://worker-03:8003
+      - REDIS_URL=redis://redis-lock:6379/0
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-hospeda}:${RABBITMQ_PASS:-hospeda-mq-pass}@rabbitmq:5672/
+      - SWEEP_INTERVAL_SECONDS=${SWEEP_INTERVAL_SECONDS:-120}
     depends_on:
       - api-gateway
+      - redis-lock
+      - rabbitmq
     networks:
       - hospeda-net
 
   worker-02:
-    build: ./workers
+    build:
+      context: .
+      dockerfile: workers/Dockerfile
     container_name: hospeda_worker_02
     ports:
       - "8002:8002"
@@ -63,13 +93,20 @@ services:
       - PORT=8002
       - SELF_URL=http://worker-02:8002
       - PEER_WORKERS=http://worker-01:8001,http://worker-03:8003
+      - REDIS_URL=redis://redis-lock:6379/0
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-hospeda}:${RABBITMQ_PASS:-hospeda-mq-pass}@rabbitmq:5672/
+      - SWEEP_INTERVAL_SECONDS=${SWEEP_INTERVAL_SECONDS:-120}
     depends_on:
       - api-gateway
+      - redis-lock
+      - rabbitmq
     networks:
       - hospeda-net
 
   worker-03:
-    build: ./workers
+    build:
+      context: .
+      dockerfile: workers/Dockerfile
     container_name: hospeda_worker_03
     ports:
       - "8003:8003"
@@ -79,8 +116,13 @@ services:
       - PORT=8003
       - SELF_URL=http://worker-03:8003
       - PEER_WORKERS=http://worker-01:8001,http://worker-02:8002
+      - REDIS_URL=redis://redis-lock:6379/0
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-hospeda}:${RABBITMQ_PASS:-hospeda-mq-pass}@rabbitmq:5672/
+      - SWEEP_INTERVAL_SECONDS=${SWEEP_INTERVAL_SECONDS:-120}
     depends_on:
       - api-gateway
+      - redis-lock
+      - rabbitmq
     networks:
       - hospeda-net
 
