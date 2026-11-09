@@ -14,7 +14,10 @@ import datetime
 from typing import Optional
 from pathlib import Path
 
-from database import init_db, SessionLocal, JobHistory, Hotel
+from database import init_db, SessionLocal, JobHistory, Hotel, get_db
+from lamport import merge_events
+import sweeps
+from sweeps import EVENTS, router as sweeps_router
 from hotels import seed_if_empty, refresh_from_xotelo
 from distlock import acquire_lock, release_lock, is_locked, check_connection, list_locks
 
@@ -25,6 +28,8 @@ STATIC_DIR = BASE_DIR / "static"
 
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+app.include_router(sweeps_router)
 
 ACTIVE_WORKERS = {}
 
@@ -39,15 +44,11 @@ class TriggerJobRequest(BaseModel):
     checkout_date: str
     currency: Optional[str] = "BRL"
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+_consumer_task = None
 
 @app.on_event("startup")
-def startup_event():
+async def startup_event():
+    global _consumer_task
     # Inicializa as tabelas no PostgreSQL ao subir o Gateway
     try:
         init_db()
@@ -58,6 +59,17 @@ def startup_event():
             db.close()
     except Exception as e:
         print(f"Aguardando conexão com o banco de dados... ({e})")
+    # Consumidor de resultados em background: falha de broker nunca derruba o gateway.
+    _consumer_task = asyncio.create_task(sweeps.run_results_consumer())
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    if _consumer_task is not None:
+        _consumer_task.cancel()
+        try:
+            await _consumer_task
+        except BaseException:
+            pass
 
 @app.get("/")
 async def read_index():
@@ -73,7 +85,8 @@ def health():
         "status": "UP",
         "service": "api-gateway",
         "registered_workers": len(ACTIVE_WORKERS),
-        "redis_lock_connection": "UP" if redis_ok else "DOWN"
+        "redis_lock_connection": "UP" if redis_ok else "DOWN",
+        "rabbitmq": "UP" if sweeps.consumer_connected() else "DOWN",
     }
 
 @app.get("/locks/{hotel_name}")
@@ -121,6 +134,31 @@ async def coordination_status():
         "active_locks": locks,
     }
 
+@app.get("/coordination/events")
+async def coordination_events(limit: int = 100):
+    """Eventos de todos os nos (workers ativos + gateway) fundidos em ordem de Lamport."""
+    limit = max(1, min(limit, 1000))
+    now = time.time()
+    workers = {k: v for k, v in ACTIVE_WORKERS.items() if now - v["last_seen"] < 15}
+
+    async def fetch(client, worker_id, info):
+        try:
+            resp = await client.get(f"{info['endpoint']}/events")
+            resp.raise_for_status()
+            data = resp.json()
+            events = data.get("events", []) if isinstance(data, dict) else data
+            return worker_id, [e for e in events if isinstance(e, dict) and "lamport" in e and "node" in e]
+        except Exception:
+            return worker_id, None
+
+    async with httpx.AsyncClient(timeout=1.5) as client:
+        answers = await asyncio.gather(*(fetch(client, k, v) for k, v in workers.items()))
+
+    reached = [w for w, ev in answers if ev is not None]
+    failed = [w for w, ev in answers if ev is None]
+    merged = merge_events(EVENTS.snapshot(), *[ev for _, ev in answers if ev])
+    return {"events": merged[-limit:], "nodes_reached": reached, "nodes_failed": failed}
+
 @app.post("/registry/register")
 def register_worker(req: RegisterWorkerRequest):
     ACTIVE_WORKERS[req.worker_id] = {
@@ -166,6 +204,7 @@ def _job_to_dict(r: JobHistory) -> dict:
         "fetched_at": r.fetched_at,
         "processed_by": r.processed_by,
         "processing_time_ms": r.processing_time_ms,
+        "sweep_id": getattr(r, "sweep_id", None),
         "created_at": _iso_utc(r.created_at),
     }
 
@@ -275,6 +314,7 @@ async def dispatch_job(req: TriggerJobRequest, db: Session = Depends(get_db)):
 
     # Exclusao mutua por hotel_key; owner_id = job_id (so quem adquiriu libera).
     if not acquire_lock(hotel_key, owner_id=job_id, ttl=30):
+        EVENTS.log("lock_conflict", job_id=job_id, hotel_key=hotel_key)
         raise HTTPException(
             status_code=409,
             detail=f"O hotel '{hotel_name}' ja esta sendo processado por outra requisicao. Tente novamente em instantes."
@@ -284,8 +324,12 @@ async def dispatch_job(req: TriggerJobRequest, db: Session = Depends(get_db)):
         worker_data = None
         failure = None  # (status, detail) quando o worker esta indisponivel
         try:
+            sent = EVENTS.log("dispatch_sent", job_id=job_id, hotel_key=hotel_key, worker=selected_id)
             async with httpx.AsyncClient(timeout=15.0) as client:
-                response = await client.post(f"{target_url}/scrape", json=payload)
+                response = await client.post(f"{target_url}/scrape", json=payload,
+                                             headers={"X-Lamport": str(sent["lamport"])})
+            EVENTS.log("dispatch_done", received=response.headers.get("X-Lamport"),
+                       job_id=job_id, worker=selected_id, http_status=response.status_code)
             if response.status_code == 200:
                 worker_data = response.json()
             elif response.status_code == 404:

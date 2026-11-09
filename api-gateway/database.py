@@ -33,6 +33,8 @@ class JobHistory(Base):
     min_rate = Column(Float, nullable=True)
     source = Column(String, nullable=True)
     fetched_at = Column(String, nullable=True)
+    # Varredura em lote (POST /sweeps) que originou o job; nulo para despachos avulsos.
+    sweep_id = Column(String, nullable=True, index=True)
 
 
 class Hotel(Base):
@@ -56,6 +58,7 @@ NEW_JOB_COLUMNS = {
     "min_rate": "DOUBLE PRECISION",
     "source": "VARCHAR",
     "fetched_at": "VARCHAR",
+    "sweep_id": "VARCHAR",
 }
 
 
@@ -67,8 +70,17 @@ def migrate_job_history():
         with engine.begin() as conn:
             for col, typ in NEW_JOB_COLUMNS.items():
                 conn.execute(text(f"ALTER TABLE job_history ADD COLUMN IF NOT EXISTS {col} {typ}"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_job_history_sweep_id ON job_history (sweep_id)"))
     except Exception as e:
         print(f"Migracao de job_history ignorada: {e}")
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
 
 def init_db():
     retries = 10
