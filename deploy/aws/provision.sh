@@ -60,32 +60,57 @@ else
 fi
 
 # ---- Security Groups ---------------------------------------------------------
-SG_EDGE=$(run ec2 create-security-group --group-name "$SG_EDGE_NAME" \
-  --description "HospedaSync edge" --vpc-id "$VPC_ID" --query GroupId --output text)
-SG_WORKERS=$(run ec2 create-security-group --group-name "$SG_WORKERS_NAME" \
-  --description "HospedaSync workers e bancos" --vpc-id "$VPC_ID" --query GroupId --output text)
+# Idempotente: reutiliza o grupo se ja existir (permite repetir o script apos uma falha de rede)
+ensure_sg() {  # ensure_sg <nome> <descricao>
+  local id
+  if [ "$DRY_RUN" != 1 ]; then
+    id=$(aws ec2 describe-security-groups --filters Name=group-name,Values="$1" Name=vpc-id,Values="$VPC_ID" \
+      --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null || true)
+    if [ -n "$id" ] && [ "$id" != "None" ]; then echo "$id"; return 0; fi
+  fi
+  run ec2 create-security-group --group-name "$1" --description "$2" --vpc-id "$VPC_ID" --query GroupId --output text
+}
+# Regra ja existente nao e erro
+allow() {
+  local out
+  if [ "$DRY_RUN" = 1 ]; then run ec2 authorize-security-group-ingress "$@" >/dev/null; return 0; fi
+  echo "+ aws ec2 authorize-security-group-ingress $*" >&2
+  out=$(aws ec2 authorize-security-group-ingress "$@" 2>&1) || { echo "$out" | grep -q 'InvalidPermission.Duplicate' || { echo "$out" >&2; return 1; }; }
+}
+SG_EDGE=$(ensure_sg "$SG_EDGE_NAME" "HospedaSync edge")
+SG_WORKERS=$(ensure_sg "$SG_WORKERS_NAME" "HospedaSync workers e bancos")
 
 # edge: 80/443 ao mundo; 22 so do seu IP
-run ec2 authorize-security-group-ingress --group-id "$SG_EDGE" --protocol tcp --port 80  --cidr 0.0.0.0/0 >/dev/null
-run ec2 authorize-security-group-ingress --group-id "$SG_EDGE" --protocol tcp --port 443 --cidr 0.0.0.0/0 >/dev/null
-run ec2 authorize-security-group-ingress --group-id "$SG_EDGE" --protocol tcp --port 22  --cidr "$MY_IP"  >/dev/null
+allow --group-id "$SG_EDGE" --protocol tcp --port 80  --cidr 0.0.0.0/0 >/dev/null
+allow --group-id "$SG_EDGE" --protocol tcp --port 443 --cidr 0.0.0.0/0 >/dev/null
+allow --group-id "$SG_EDGE" --protocol tcp --port 22  --cidr "$MY_IP"  >/dev/null
 # edge: gateway (8000), RabbitMQ (5672) e Redis (6379) so a partir dos workers
 for p in 8000 5672 6379; do
-  run ec2 authorize-security-group-ingress --group-id "$SG_EDGE" --protocol tcp --port "$p" --source-group "$SG_WORKERS" >/dev/null
+  allow --group-id "$SG_EDGE" --protocol tcp --port "$p" --source-group "$SG_WORKERS" >/dev/null
 done
 
 # workers: 22 so do seu IP; workers (8001-8003) e Postgres (5432) so do edge e entre si
-run ec2 authorize-security-group-ingress --group-id "$SG_WORKERS" --protocol tcp --port 22 --cidr "$MY_IP" >/dev/null
+allow --group-id "$SG_WORKERS" --protocol tcp --port 22 --cidr "$MY_IP" >/dev/null
 for src in "$SG_EDGE" "$SG_WORKERS"; do
-  run ec2 authorize-security-group-ingress --group-id "$SG_WORKERS" --protocol tcp --port 8001-8003 --source-group "$src" >/dev/null
-  run ec2 authorize-security-group-ingress --group-id "$SG_WORKERS" --protocol tcp --port 5432      --source-group "$src" >/dev/null
+  allow --group-id "$SG_WORKERS" --protocol tcp --port 8001-8003 --source-group "$src" >/dev/null
+  allow --group-id "$SG_WORKERS" --protocol tcp --port 5432      --source-group "$src" >/dev/null
 done
 # 15672 (painel RabbitMQ) NAO e aberto: acesse por tunel SSH (ssh -L 15672:localhost:15672 ...)
 
 # ---- Instancias --------------------------------------------------------------
+# AMI: por padrao a mais recente do Amazon Linux 2023 via describe-images (nao exige permissao no SSM).
+# Para fixar uma imagem: AMI_ID=ami-xxxx
+if [ -z "${AMI_ID:-}" ]; then
+  if [ "$DRY_RUN" = 1 ]; then AMI_ID="ami-DRY-RUN"; else
+    AMI_ID=$(aws ec2 describe-images --owners amazon \
+      --filters 'Name=name,Values=al2023-ami-2023.*-kernel-*-x86_64' 'Name=state,Values=available' \
+      --query 'sort_by(Images,&CreationDate)[-1].ImageId' --output text)
+  fi
+fi
+echo "AMI: $AMI_ID" >&2
 launch() {  # launch <nome> <tipo> <sg>
   run ec2 run-instances \
-    --image-id "resolve:ssm:$AMI_PARAM" \
+    --image-id "$AMI_ID" \
     --instance-type "$2" \
     --key-name "$KEY_NAME" \
     --subnet-id "$SUBNET_ID" \
