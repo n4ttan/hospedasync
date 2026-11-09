@@ -65,6 +65,16 @@ veredito() {  # veredito <n> <PASS|FAIL> <detalhe>
   else printf '%sVEREDITO: FAIL%s - %s\n' "$R" "$N" "$3"; fi
 }
 
+# Credenciais: ambiente ou, na falta, o .env local (nunca versionado)
+_HS_ENV="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/.env"
+_from_env_file() { grep -E "^$1=" "$_HS_ENV" 2>/dev/null | cut -d= -f2-; }
+[ -z "${ADMIN_USER:-}" ] && ADMIN_USER=$(_from_env_file ADMIN_USER)
+[ -z "${ADMIN_PASSWORD:-}" ] && ADMIN_PASSWORD=$(_from_env_file ADMIN_PASSWORD)
+export ADMIN_USER ADMIN_PASSWORD
+[ -z "${RABBITMQ_PASS:-}" ] && RABBITMQ_PASS=$(_from_env_file RABBITMQ_PASS)
+[ -z "${RABBITMQ_USER:-}" ] && RABBITMQ_USER=$(_from_env_file RABBITMQ_USER)
+MQ_USER=${RABBITMQ_USER:-$MQ_USER}; MQ_PASS=${RABBITMQ_PASS:-$MQ_PASS}
+
 login() {
   [ -n "$TOKEN" ] && [ "$LOGIN_DONE" = 0 ] && return 0   # TOKEN dado pelo usuario: nao renova
   if [ -n "${ADMIN_USER:-}" ] && [ -n "${ADMIN_PASSWORD:-}" ]; then
