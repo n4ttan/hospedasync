@@ -7,6 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import httpx
 
+import servicetoken
+
 import election
 import scraper
 import consumer
@@ -61,10 +63,14 @@ async def _guarded(factory):
 
 
 async def send_periodic_heartbeat():
+    secret = os.getenv("SERVICE_SECRET")
+    if not secret:
+        print(f"[{WORKER_ID}] SERVICE_SECRET ausente: heartbeat sem assinatura", flush=True)
     while True:
         try:
+            headers = servicetoken.sign(secret, WORKER_ID, SELF_URL) if secret else {}
             async with httpx.AsyncClient(timeout=3.0) as client:
-                await client.post(f"{GATEWAY_URL}/registry/register", json={
+                await client.post(f"{GATEWAY_URL}/registry/register", headers=headers, json={
                     "worker_id": WORKER_ID,
                     "endpoint": SELF_URL
                 })
