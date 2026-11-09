@@ -1,0 +1,61 @@
+# EC2-3 "workers-b": worker-03 e postgres-replica (hot standby do primario em WA_IP).
+# Uso (na raiz do repo):  docker compose -f deploy/aws/compose.workers-b.yml --env-file .env.aws up --build -d
+# Suba DEPOIS do workers-a (pg_basebackup precisa do primario no ar).
+services:
+  postgres-replica:
+    restart: unless-stopped
+    image: postgres:15-alpine
+    container_name: hospeda_db_replica
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina no .env.aws}
+      REPLICATOR_PASSWORD: ${REPLICATOR_PASSWORD:?defina no .env.aws}
+      PRIMARY_HOST: ${WA_IP:?defina WA_IP}
+    entrypoint: ["/bin/sh", "/replica-entrypoint.sh"]
+    ports:
+      - "${WB_IP:?defina WB_IP}:5432:5432"
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - postgres_replica_data:/var/lib/postgresql/data
+      - ../postgres/replica-entrypoint.sh:/replica-entrypoint.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d hospedasync_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - hospeda-net
+
+  worker-03:
+    build:
+      context: ../..
+      dockerfile: workers/Dockerfile
+    container_name: hospeda_worker_03
+    restart: unless-stopped
+    ports:
+      - "${WB_IP}:8003:8003"
+      - "127.0.0.1:8003:8003"
+    environment:
+      - GATEWAY_URL=http://${EDGE_IP:?defina EDGE_IP}:8000
+      - WORKER_ID=worker-03
+      - PORT=8003
+      - SELF_URL=http://${WB_IP}:8003
+      - PEER_WORKERS=1=http://${WA_IP}:8001,2=http://${WA_IP}:8002
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?defina no .env.aws}@${EDGE_IP}:6379/0
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-hospeda}:${RABBITMQ_PASS:?defina no .env.aws}@${EDGE_IP}:5672/
+      - SWEEP_INTERVAL_SECONDS=${SWEEP_INTERVAL_SECONDS:-120}
+      - SERVICE_SECRET=${SERVICE_SECRET:?defina no .env.aws}
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import os,urllib.request; urllib.request.urlopen('http://localhost:%s/health' % os.environ['PORT'], timeout=3)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    networks:
+      - hospeda-net
+
+networks:
+  hospeda-net:
+    driver: bridge
+
+volumes:
+  postgres_replica_data:

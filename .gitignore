@@ -6,3 +6,8 @@ __pycache__/
 .vscode/
 *.log
 deploy/nginx/certs/
+
+# segredos da implantacao AWS
+.env.aws
+deploy/aws/.env.aws
+*.pem
