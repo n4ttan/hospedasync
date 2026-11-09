@@ -110,7 +110,7 @@ def test_extract_id_invalid(el, url):
 
 def test_election_ok_only_if_my_id_greater(client):
     r = client.post("/election", json={"candidate_id": 1, "term": 1.0}).json()
-    assert r == {"status": "OK", "responder_id": 2}
+    assert r["status"] == "OK" and r["responder_id"] == 2
     assert client.started == [1]  # dispara a propria eleicao
     for cand in (2, 3):
         r = client.post("/election", json={"candidate_id": cand, "term": 1.0}).json()
@@ -120,7 +120,7 @@ def test_election_ok_only_if_my_id_greater(client):
 
 def test_coordinator_accepts_and_sets_leader(client, el):
     r = client.post("/coordinator", json={"leader_id": 3, "term": 100.0}).json()
-    assert r == {"status": "ACK", "worker_id": 2}
+    assert r["status"] == "ACK" and r["worker_id"] == 2
     assert client.get("/leader").json() == {"leader_id": 3, "am_i_leader": False}
 
 
@@ -191,3 +191,65 @@ def test_start_election_skipped_if_already_in_progress(el, monkeypatch):
     el.election_in_progress = True
     asyncio.run(el.start_election())
     assert posts == [] and el.CURRENT_LEADER_ID is None
+
+
+# ---------- ID, peers e relogio de Lamport ----------
+
+def _load(monkeypatch, **env):
+    for k in ("WORKER_ID", "SELF_URL", "PEER_WORKERS"):
+        monkeypatch.delenv(k, raising=False)
+    for k, v in env.items():
+        monkeypatch.setenv(k, v)
+    spec = importlib.util.spec_from_file_location("hs_election_x", ELECTION)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_my_id_from_worker_id(monkeypatch):
+    m = _load(monkeypatch, WORKER_ID="worker-02", SELF_URL="http://10.0.1.7:8001")
+    assert m.MY_ID == 2 and m.WORKER_ID == "worker-02"
+
+
+def test_my_id_falls_back_to_self_url(monkeypatch):
+    m = _load(monkeypatch, WORKER_ID="alpha", SELF_URL="http://worker-05:8001")
+    assert m.MY_ID == 5
+    m = _load(monkeypatch, SELF_URL="http://worker-03:8001")
+    assert m.MY_ID == 3
+
+
+def test_peer_workers_both_formats(monkeypatch):
+    m = _load(monkeypatch, WORKER_ID="worker-02", SELF_URL="http://10.0.1.2:8002",
+              PEER_WORKERS="1=http://10.0.1.5:8001, http://worker-03:8003")
+    assert m.PEERS == {2: "http://10.0.1.2:8002", 1: "http://10.0.1.5:8001", 3: "http://worker-03:8003"}
+
+
+def test_lamport_in_responses_and_events(client, el):
+    r = client.post("/election", json={"candidate_id": 1, "term": 1.0, "lamport": 50}).json()
+    assert r["lamport"] > 50
+    r = client.post("/coordinator", json={"leader_id": 3, "term": 5.0, "lamport": 200}).json()
+    assert r["lamport"] > 200
+    ev = client.get("/events").json()
+    assert ev["node"] == "worker-02" and ev["lamport"] >= r["lamport"]
+    types = [e["type"] for e in ev["events"]]
+    assert "coordinator_received" in types
+    assert "election_received" in types
+
+
+def test_lamport_optional_in_requests(client):
+    assert client.post("/election", json={"candidate_id": 1, "term": 1.0}).status_code == 200
+
+
+def test_become_leader_runs_hooks_and_logs(el, monkeypatch):
+    called = []
+
+    async def hook():
+        called.append(1)
+
+    monkeypatch.setattr(el, "on_became_leader", [hook])
+    posts = fake_httpx(monkeypatch, el, {"http://worker-0": FakeResp(200, {"status": "ACK", "lamport": 999})})
+    asyncio.run(el.become_leader(1.0))
+    assert called == [1]
+    assert all("lamport" in body for _, body in posts)
+    assert el.CLOCK.time > 999
+    assert "became_leader" in [e["type"] for e in el.EVENTS.snapshot()]

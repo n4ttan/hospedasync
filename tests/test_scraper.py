@@ -40,6 +40,7 @@ def mods():
 def env(mods):
     main, scraper = mods
     scraper.clear_cache()
+    scraper._redis_down_until = float("inf")  # sem Redis nos testes: usa o cache em memoria
     scraper.BACKOFF_BASE = 0
     calls = []
 
@@ -51,6 +52,7 @@ def env(mods):
 
     yield TestClient(main.app), scraper, install, calls
     scraper._transport = None
+    scraper._redis_down_until = 0.0
     scraper.clear_cache()
 
 
