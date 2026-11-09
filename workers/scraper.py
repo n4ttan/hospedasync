@@ -1,5 +1,6 @@
 """Cliente da API Xotelo: retries com backoff, semaforo de concorrencia e cache TTL."""
 import asyncio
+import json
 import os
 import time
 from datetime import datetime, timezone
@@ -12,11 +13,15 @@ MAX_ATTEMPTS = int(os.getenv("XOTELO_MAX_ATTEMPTS", "3"))
 BACKOFF_BASE = float(os.getenv("XOTELO_BACKOFF_BASE", "0.5"))  # 0.5 s, 1 s
 CACHE_TTL = float(os.getenv("XOTELO_CACHE_TTL", "300"))
 MAX_CONCURRENCY = int(os.getenv("XOTELO_MAX_CONCURRENCY", "3"))
+REDIS_URL = os.getenv("REDIS_URL", "redis://redis-lock:6379/0")
 USER_AGENT = "HospedaSync/1.0 (trabalho academico de Sistemas Distribuidos)"
 
 _transport = None  # injetavel em testes (httpx.MockTransport)
 _cache: dict = {}  # chave -> (expira_em, payload)
 _sem = None
+_redis = None  # cliente redis-py sincrono (lazy); injetavel em testes
+_redis_down_until = 0.0  # apos falha, nao tenta o Redis ate este instante (monotonic)
+REDIS_RETRY_AFTER = 10.0
 
 
 class UpstreamError(Exception):
@@ -36,6 +41,43 @@ def _semaphore():
 
 def clear_cache():
     _cache.clear()
+
+
+def _cache_key(hotel_key, chk_in, chk_out, currency):
+    return f"cache:rates:{hotel_key}:{chk_in}:{chk_out}:{currency}"
+
+
+def _redis_client():
+    global _redis
+    if _redis is None:
+        import redis
+        _redis = redis.Redis.from_url(
+            REDIS_URL, decode_responses=True, socket_connect_timeout=1, socket_timeout=1
+        )
+    return _redis
+
+
+def _redis_get(key):
+    """Sincrona. Devolve dict ou None; qualquer falha vira None (e pausa o Redis por alguns segundos)."""
+    global _redis_down_until
+    if time.monotonic() < _redis_down_until:
+        return None
+    try:
+        raw = _redis_client().get(key)
+        return json.loads(raw) if raw else None
+    except Exception:
+        _redis_down_until = time.monotonic() + REDIS_RETRY_AFTER
+        return None
+
+
+def _redis_set(key, data):
+    global _redis_down_until
+    if time.monotonic() < _redis_down_until:
+        return
+    try:
+        _redis_client().set(key, json.dumps(data), ex=int(CACHE_TTL))
+    except Exception:
+        _redis_down_until = time.monotonic() + REDIS_RETRY_AFTER
 
 
 async def _call(hotel_key, chk_in, chk_out, currency):
@@ -70,6 +112,10 @@ async def _call(hotel_key, chk_in, chk_out, currency):
 async def fetch_rates(hotel_key, chk_in, chk_out, currency="BRL"):
     """Retorna dict {rates, min_rate, source, fetched_at, tripadvisor_url}."""
     key = (hotel_key, chk_in, chk_out, currency)
+    rkey = _cache_key(hotel_key, chk_in, chk_out, currency)
+    shared = await asyncio.to_thread(_redis_get, rkey)
+    if shared:
+        return {**shared, "source": "cache"}
     hit = _cache.get(key)
     if hit and hit[0] > time.monotonic():
         return {**hit[1], "source": "cache"}
@@ -90,4 +136,5 @@ async def fetch_rates(hotel_key, chk_in, chk_out, currency="BRL"):
         "tripadvisor_url": result.get("tripadvisor_url"),
     }
     _cache[key] = (time.monotonic() + CACHE_TTL, data)
+    await asyncio.to_thread(_redis_set, rkey, data)
     return {**data, "source": "live"}
