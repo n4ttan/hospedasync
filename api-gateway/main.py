@@ -8,10 +8,11 @@ import os
 import uuid
 import time
 import random
+import asyncio
 from pathlib import Path
 
 from database import init_db, SessionLocal, JobHistory
-from distlock import acquire_lock, release_lock, is_locked, check_connection
+from distlock import acquire_lock, release_lock, is_locked, check_connection, list_locks
 
 app = FastAPI(title="HospedaSync API Gateway", version="1.0.0")
 
@@ -68,6 +69,46 @@ def health():
 def get_lock_status(hotel_name: str):
     """Endpoint de diagnostico: informa se o hotel esta com lock ativo."""
     return {"hotel_name": hotel_name, "locked": is_locked(hotel_name)}
+
+@app.get("/locks")
+def get_active_locks():
+    """Diagnostico: todos os locks de hotel atualmente ativos no Redis."""
+    try:
+        return {"locks": list_locks()}
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Redis indisponivel: {exc}")
+
+@app.get("/coordination/status")
+async def coordination_status():
+    """
+    Visao de coordenacao do cluster: pergunta a cada worker registrado quem ele
+    considera o lider (Bully) e informa se ha consenso, alem dos locks ativos.
+    """
+    now = time.time()
+    workers = {k: v for k, v in ACTIVE_WORKERS.items() if now - v["last_seen"] < 15}
+
+    async def ask(client, worker_id, info):
+        try:
+            resp = await client.get(f"{info['endpoint']}/leader")
+            return worker_id, resp.json().get("leader_id")
+        except Exception:
+            return worker_id, "unreachable"
+
+    async with httpx.AsyncClient(timeout=1.5) as client:
+        answers = await asyncio.gather(*(ask(client, k, v) for k, v in workers.items()))
+
+    views = dict(answers)
+    votes = {v for v in views.values() if v not in (None, "unreachable")}
+    try:
+        locks = list_locks()
+    except Exception:
+        locks = None
+    return {
+        "leader_id": next(iter(votes)) if len(votes) == 1 else None,
+        "consensus": len(votes) == 1,
+        "worker_views": views,
+        "active_locks": locks,
+    }
 
 @app.post("/registry/register")
 def register_worker(req: RegisterWorkerRequest):

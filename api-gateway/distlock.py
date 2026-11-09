@@ -71,6 +71,18 @@ def is_locked(resource_name: str) -> bool:
     return bool(_client.exists(key))
 
 
+def list_locks() -> list:
+    """Diagnostico: lista os locks ativos (hotel, dono e TTL restante em segundos)."""
+    locks = []
+    for key in _client.scan_iter(match=f"{LOCK_PREFIX}*"):
+        locks.append({
+            "resource": key[len(LOCK_PREFIX):],
+            "owner": _client.get(key),
+            "ttl_seconds": _client.ttl(key),
+        })
+    return locks
+
+
 def check_connection() -> bool:
     """Usado no health check do Gateway para reportar status do Redis."""
     try:
