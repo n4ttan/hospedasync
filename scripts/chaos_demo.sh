@@ -122,7 +122,7 @@ container_healthy() {
 }
 redis_ok()  { [ "$(docker exec hospeda_redis_lock redis-cli ping 2>/dev/null)" = PONG ]; }
 pg_ok()     { docker exec hospeda_db pg_isready -U postgres -d hospedasync_db >/dev/null 2>&1; }
-gw_ok()     { curl -sf -m 3 "$GW/health" >/dev/null; }
+gw_ok()     { curl -sf -m "${GW_OK_TIMEOUT:-3}" "$GW/health" >/dev/null; }
 nodes_ok()  { [ "$(api "$GW/registry/nodes" | pyj 'd["count"]')" = 3 ]; }
 cluster_ok() { gw_ok && nodes_ok && [ "$(consensus)" = True ]; }
 
@@ -376,7 +376,7 @@ exp5() {
     n=$((n + 1)); dispatch_fresh >/dev/null
     opened=0
     for p in 8001 8002 8003; do
-      st=$(curl -s -m 5 "http://localhost:$p/health" | pyj 'd.get("xotelo_breaker",{}).get("state","?")')
+      st=$(curl -s -m 5 "${WORKER_HEALTH_BASE:-http://localhost}:$((p + ${WORKER_PORT_OFFSET:-0}))/health" | pyj 'd.get("xotelo_breaker",{}).get("state","?")')
       [ "$st" = "open" ] && opened=$((opened + 1))
     done
   done
@@ -408,7 +408,7 @@ exp6() {
   obs "durante a queda: /health do gateway deve continuar respondendo"
   while [ $((SECONDS - t0)) -lt 15 ]; do
     total=$((total + 1))
-    if curl -sf -m 3 "$GW/health" >/dev/null; then up=$((up + 1)); fi
+    if curl -sf -m "${GW_OK_TIMEOUT:-3}" "$GW/health" >/dev/null; then up=$((up + 1)); fi
     sleep 2
   done
   info "/health respondeu $up/$total vezes durante a queda"
@@ -471,7 +471,7 @@ for n in "${RUN[@]}"; do
 done
 
 if [ "${SAVE:-0}" = 1 ]; then
-  OUT="$ROOT/docs/relatorio/evidencias/chaos_$(date +%F).md"
+  OUT="${EVIDENCE_FILE:-$ROOT/docs/relatorio/evidencias/chaos_$(date +%F).md}"
   mkdir -p "$(dirname "$OUT")"
   { printf '# Experimentos de caos - %s\n\nGerado por `scripts/chaos_demo.sh` (%s).\n\n' "$(date +%F)" "$(date '+%F %T')"
     printf '%s\n' "$TABLE"; } > "$OUT"
