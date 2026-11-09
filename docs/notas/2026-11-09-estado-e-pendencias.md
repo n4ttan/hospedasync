@@ -1,26 +1,23 @@
-# Estado e pendências (retomada)
+# Estado e pendências
 
-Branch `feature/messaging`. Fases A (dados reais Xotelo), B (fila, Lamport, líder agendador), C (réplica Postgres e consistência),
-D parcial (breaker, retry, failover do dispatch) e E (JWT, HMAC no registry, Nginx TLS) estão commitadas. Nada foi enviado ao GitHub.
+Branch `feature/messaging`, tudo commitado localmente. Nada enviado ao GitHub. Nada implantado na AWS.
 
-## Resultado do caos (scripts/chaos_demo.sh, primeira execução real)
-- 1 worker morto na varredura: PASS (15/15, job_ids únicos).
-- 2 líder morto: FAIL. Reeleição em 2 s, mas nenhuma varredura periódica. Causa: o agendador chamava `/hotels` (agora exige JWT) e levava 401.
-  Correção já escrita e com testes (137 passando), AINDA NÃO commitada nem reconstruída no cluster: rota `GET /internal/hotels` com HMAC
-  (`api-gateway/main.py`) e `workers/scheduler.py` assinando o pedido. Falta `docker compose up --build -d` e repetir `bash scripts/chaos_demo.sh 2`.
-- 3 RabbitMQ fora 20 s: PASS. 4 Redis fora 20 s: PASS (DLQ 0).
-- 5 Xotelo bloqueada: FAIL (breakers abertos 0/3; durante o bloqueio respondeu SUCCESS com cache; não voltou a `live`). A investigar: o método de bloqueio
-  (/etc/hosts) pode não impedir a chamada por causa do cache compartilhado no Redis (TTL 300 s) ou o breaker não conta falhas; conferir `workers/scraper.py`
-  e `scripts/chaos_demo.sh` (experimento 5).
-- 6 Postgres fora 15 s: não chegou a ser registrado; rodar `bash scripts/chaos_demo.sh 6`.
+## Feito e verificado
+- Dados reais (Xotelo), fila RabbitMQ, lock por hotel, Bully com Lamport, líder agendador, réplica Postgres com consistência forte/eventual medida,
+  breaker e failover, JWT/RBAC, HMAC em toda chamada interna, Nginx com TLS, segredos no `.env` local.
+- Caos (`scripts/chaos_demo.sh all`, 09/11/2026): 6 de 6 PASS em uma execução completa. Evidência em `docs/relatorio/evidencias/chaos_2026-11-09.md`.
+- Dois defeitos achados pelo próprio caos e corrigidos: agendador levava 401 em `/hotels` depois do JWT (agora usa `/internal/hotels` com HMAC);
+  502 do worker por queda da fonte abria o breaker do gateway (agora só conta falha de conexão); o script de caos usava a mesma data a cada chamada (cache).
+- Suíte: 164 testes verdes (Redis de teste na porta 6380).
 
-## Em andamento quando o limite acabou
-Um agente adicionava autenticação HMAC em TODA chamada interna (Gateway->Worker `/scrape`, `/leader`, `/events`; Worker->Worker `/election`, `/coordinator`)
-em `shared/servicetoken.py`, `workers/security.py`, `api-gateway/main.py`, `workers/election.py` e testes. Pode haver edições parciais NÃO commitadas.
-Antes de commitar: `git status`, rodar a suíte inteira (REDIS_URL=redis://localhost:6380/0, Redis de teste na 6380) e só commitar se estiver verde.
+## Falta
+- AWS: subir 3 EC2 com `deploy/aws/` (NUNCA testado na AWS; depende da conta do usuário). Rodar demo e caos lá.
+- Revisões: `security-review` e `architect-reviewer` antes da entrega 4 (07/12).
+- Relatório final: base em `docs/relatorio/` (matriz, arquitetura, roteiro); incluir prints e logs reais.
+- Rafael (nomeação) e Felipe (consistência): combinar merge no `develop`; roteiros já em `docs/felipe/`.
+- Push e PR só com autorização do usuário.
 
-## Falta (plano em ~/.claude/plans/misty-wondering-zephyr.md)
-Fase F: arquivos de implantação multi-host na AWS (`deploy/compose.*.yml`), 3 EC2 em us-east-1, ensaio; depende da conta AWS do usuário.
-Fase G: relatório final (base em docs/relatorio/), evidências de caos em docs/relatorio/evidencias/, revisão com security-review e architect-reviewer.
-A nota docs/notas/2026-11-09-tolerancia-a-falhas.md está desatualizada (o compose já tem restart e healthchecks).
-Push e PR só com autorização do usuário. Segredos ficam no `.env` local (não versionado).
+## Limites conhecidos (declarar no relatório)
+Redis, RabbitMQ e gateway únicos; DLQ sem consumidor; Postgres sem failover automático (promoção manual documentada);
+Bully sem quórum; líder não influencia o roteamento do dispatch; canal interno em HTTP com assinatura HMAC, sem TLS interno;
+fonte de preços de terceiro, não oficial; sem gRPC (REST atende o enunciado).

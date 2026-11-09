@@ -36,7 +36,7 @@ Responsável: Nattan. Verificação experimental: `scripts/chaos_demo.sh` (exper
 
 ## Falhas NÃO cobertas
 
-* **Restart policy: não há.** `docker-compose.yml` não define `restart:` em nenhum serviço. Container que morre fica parado até alguém dar `docker start`; o script de caos faz isso na recuperação. Também não há healthcheck nos serviços da aplicação (gateway e workers).
+* **Restart policy: atendida.** `docker-compose.yml` define `restart: unless-stopped` nos servicos e healthchecks no gateway, nos workers, no Postgres (primario e replica), no Redis e no RabbitMQ; o Nginx so sobe depois que o gateway fica saudavel. O script de caos ainda faz `docker start` na recuperacao para garantir o estado inicial entre experimentos.
 * **Redis único.** Locks, contadores de varredura e cache compartilhado dependem de uma instância sem réplica nem Sentinel. Com ele fora: `POST /sweeps` e `GET /sweeps/<id>` dão 503, `/jobs/dispatch` falha, e o progresso só é preservado porque o `docker stop` faz snapshot (sem volume, `docker rm` perde tudo).
 * **RabbitMQ único.** Sem cluster nem filas quorum. Com o broker fora, nenhuma varredura é aceita; o líder não consegue agendar (a tentativa falha e espera o próximo ciclo). Mensagens em voo dependem do disco do contêiner (sem volume nomeado).
 * **Primário Postgres sem failover automático.** A réplica serve leitura (`eventual`), mas ninguém a promove. Com o primário fora, escritas e consultas `strong` falham até alguém reiniciá-lo; o gateway degrada, não se recupera sozinho para a réplica.
