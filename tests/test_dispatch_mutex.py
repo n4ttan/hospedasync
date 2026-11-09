@@ -12,22 +12,29 @@ RealAsyncClient = httpx.AsyncClient
 
 
 @pytest.fixture
-def gw(clean_locks, monkeypatch):
+def gw(clean_locks, monkeypatch, tmp_path):
     spec = importlib.util.spec_from_file_location("hs_gateway_main", GATEWAY)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     monkeypatch.setattr(mod, "init_db", lambda: None)
-    mod.app.dependency_overrides[mod.get_db] = lambda: _FakeDB()
+    import database
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    eng = create_engine(f"sqlite:///{tmp_path / 'gw.db'}", connect_args={"check_same_thread": False})
+    database.Base.metadata.create_all(bind=eng)
+    Session = sessionmaker(bind=eng, autoflush=False)
+
+    def _get_db():
+        s = Session()
+        try:
+            yield s
+        finally:
+            s.close()
+
+    mod.app.dependency_overrides[mod.get_db] = _get_db
     mod.ACTIVE_WORKERS.clear()
     yield mod
     mod.app.dependency_overrides.clear()
-
-
-class _FakeDB:
-    def add(self, o): pass
-    def commit(self): pass
-    def rollback(self): pass
-    def close(self): pass
 
 
 def install_worker(gw, monkeypatch, delay=0.0, fail=False):
@@ -36,15 +43,18 @@ def install_worker(gw, monkeypatch, delay=0.0, fail=False):
     async def handler(request: httpx.Request):
         import json
         body = json.loads(request.content)
-        calls.append(body["hotel_name"])
+        calls.append(body["hotel_key"])
         if fail:
             raise httpx.ConnectError("worker fora do ar", request=request)
         await asyncio.sleep(delay)
         return httpx.Response(200, json={
-            "job_id": body["job_id"], "hotel_name": body["hotel_name"],
-            "daily_rate": 100.0, "processed_by": "mock-worker",
-            "processing_time_ms": 1.0, "checkin_date": body["checkin_date"],
-            "checkout_date": body["checkout_date"],
+            "job_id": body["job_id"], "hotel_key": body["hotel_key"],
+            "hotel_name": body["hotel_name"], "currency": body["currency"],
+            "rates": [{"code": "BookingCom", "name": "Booking.com", "rate": 100.0}],
+            "min_rate": 100.0, "daily_rate": 100.0, "source": "live",
+            "fetched_at": "2026-01-01T00:00:00Z", "tripadvisor_url": None,
+            "processed_by": "mock-worker", "processing_time_ms": 1.0,
+            "checkin_date": body["checkin_date"], "checkout_date": body["checkout_date"],
         })
 
     def factory(*a, **kw):
@@ -56,7 +66,7 @@ def install_worker(gw, monkeypatch, delay=0.0, fail=False):
 
 
 def body(hotel):
-    return {"hotel_name": hotel, "checkin_date": "2026-01-01", "checkout_date": "2026-01-02"}
+    return {"hotel_key": hotel, "checkin_date": "2026-01-01", "checkout_date": "2026-01-02"}
 
 
 def concurrent_post(gw, hotels, stagger=0.15):
@@ -100,7 +110,7 @@ def test_lock_released_after_success(gw, monkeypatch):
 def test_lock_released_when_worker_fails_then_retry_ok(gw, monkeypatch):
     install_worker(gw, monkeypatch, fail=True)
     with TestClient(gw.app) as c:
-        assert c.post("/jobs/dispatch", json=body("H")).status_code == 503
+        assert c.post("/jobs/dispatch", json=body("H")).status_code == 503  # sem cache
         assert c.get("/locks").json()["locks"] == []
         install_worker(gw, monkeypatch)  # worker volta
         assert c.post("/jobs/dispatch", json=body("H")).status_code == 200
