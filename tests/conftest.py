@@ -9,6 +9,7 @@ os.environ.setdefault("REDIS_URL", "redis://localhost:6380/0")
 os.environ.setdefault("DATABASE_URL", "sqlite://")
 sys.path.insert(0, str(ROOT / "api-gateway"))  # database (nao colide com workers/main.py)
 sys.path.insert(0, str(ROOT / "shared"))  # distlock, lamport, mq
+sys.path.append(str(ROOT / "workers"))  # security (no fim: nao sombreia main.py do gateway)
 
 
 @pytest.fixture(scope="session")
@@ -61,3 +62,20 @@ def _install_gateway_auth_override():
 
 
 _install_gateway_auth_override()
+
+
+from fastapi.testclient import TestClient  # noqa: E402
+from urllib.parse import urlsplit  # noqa: E402
+
+
+class SignedClient(TestClient):
+    """TestClient que assina cada requisicao como um peer interno (HMAC de servico)."""
+    service_id = "api-gateway"
+
+    def request(self, method, url, **kw):
+        import servicetoken
+        headers = dict(kw.pop("headers", None) or {})
+        if "X-Service-Signature" not in headers:
+            headers.update(servicetoken.sign_request(
+                os.environ["SERVICE_SECRET"], self.service_id, method, urlsplit(str(url)).path))
+        return super().request(method, url, headers=headers, **kw)

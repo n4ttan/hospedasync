@@ -7,6 +7,7 @@ from datetime import date, datetime, timedelta, timezone
 import httpx
 
 import election
+import servicetoken
 from mq import EVENTS_EXCHANGE, JOBS_QUEUE, connect, declare_topology, publish_json
 
 GATEWAY_URL = os.getenv("GATEWAY_URL", "http://127.0.0.1:8000")
@@ -57,7 +58,9 @@ def build_jobs(hotels, sweep_id, today=None):
 async def run_sweep():
     """Uma varredura: busca hoteis no Gateway, publica jobs e anuncia no fanout. Devolve o sweep_id ou None."""
     async with httpx.AsyncClient(timeout=10.0) as client:
-        resp = await client.get(f"{GATEWAY_URL}/hotels", params={"limit": SWEEP_HOTELS})
+        # Rota interna do gateway, autenticada pela assinatura HMAC do no (o /hotels publico exige JWT de usuario).
+        headers = servicetoken.sign(os.getenv("SERVICE_SECRET", ""), election.WORKER_ID, "internal:hotels")
+        resp = await client.get(f"{GATEWAY_URL}/internal/hotels", params={"limit": SWEEP_HOTELS}, headers=headers)
         resp.raise_for_status()
         hotels = resp.json()
     if not hotels:

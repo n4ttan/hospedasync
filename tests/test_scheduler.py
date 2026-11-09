@@ -33,11 +33,12 @@ class FakeHttp:
     async def __aenter__(self): return self
     async def __aexit__(self, *a): return False
 
-    async def get(self, url, params=None):
+    async def get(self, url, params=None, headers=None):
         class R:
             def raise_for_status(self): pass
             def json(self): return HOTELS
         FakeHttp.calls.append((url, params))
+        FakeHttp.last_headers = headers
         return R()
 
 
@@ -78,6 +79,8 @@ def test_sweep_publishes_jobs_and_event(sch, env):
     assert ev[0][0]["type"] == "sweep_scheduled"
     assert ev[0][0]["detail"] == {"sweep_id": sid, "jobs": 4, "leader": sch.election.MY_ID}
     assert FakeHttp.calls[0][1] == {"limit": 5}
+    assert FakeHttp.calls[0][0].endswith("/internal/hotels")
+    assert FakeHttp.last_headers["X-Service-Id"] == sch.election.WORKER_ID and FakeHttp.last_headers["X-Service-Signature"]
 
 
 def _run_one_cycle(sch, monkeypatch):

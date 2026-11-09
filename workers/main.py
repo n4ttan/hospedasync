@@ -2,12 +2,13 @@ import os
 import time
 import uuid
 import asyncio
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import httpx
 
 import servicetoken
+from security import require_peer
 
 import election
 import scraper
@@ -83,7 +84,7 @@ def health():
     return {"status": "UP", "worker_id": WORKER_ID, "leader_id": election.CURRENT_LEADER_ID,
             "lamport": election.CLOCK.time}
 
-@app.post("/scrape")
+@app.post("/scrape", dependencies=[Depends(require_peer)])
 async def execute_scrape(req: ScrapeRequest, request: Request, response: Response):
     start_time = time.time()
     received = request.headers.get("x-lamport")

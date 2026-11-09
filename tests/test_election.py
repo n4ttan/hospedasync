@@ -6,7 +6,7 @@ from pathlib import Path
 import httpx
 import pytest
 from fastapi import FastAPI
-from fastapi.testclient import TestClient
+from conftest import SignedClient as TestClient
 
 ELECTION = Path(__file__).resolve().parent.parent / "workers" / "election.py"
 

@@ -19,6 +19,7 @@ from database import (init_db, SessionLocal, JobHistory, Hotel, get_db, get_read
 from lamport import merge_events
 from resilience import CircuitBreaker
 import sweeps
+import servicetoken
 import auth
 from auth import router as auth_router, require_role, check_service_headers
 from sweeps import EVENTS, router as sweeps_router
@@ -86,6 +87,16 @@ METRICS = {"dispatch_total": 0, "dispatch_ok_total": 0, "dispatch_degraded_total
            "dispatch_conflict_total": 0, "dispatch_failover_total": 0}
 
 
+def _peer_headers(method: str, path: str, extra=None) -> dict:
+    """Assina chamada interna gateway->worker (id de servico 'api-gateway')."""
+    secret = os.getenv("SERVICE_SECRET", "")
+    # sem secret nao assina: o worker rejeita com 401 (falha fechada)
+    h = servicetoken.sign_request(secret, "api-gateway", method, path) if secret else {}
+    if extra:
+        h.update(extra)
+    return h
+
+
 def _breaker(worker_id: str) -> CircuitBreaker:
     b = _BREAKERS.get(worker_id)
     if b is None:
@@ -148,7 +159,7 @@ async def coordination_status():
 
     async def ask(client, worker_id, info):
         try:
-            resp = await client.get(f"{info['endpoint']}/leader")
+            resp = await client.get(f"{info['endpoint']}/leader", headers=_peer_headers("GET", "/leader"))
             return worker_id, resp.json().get("leader_id")
         except Exception:
             return worker_id, "unreachable"
@@ -178,7 +189,7 @@ async def coordination_events(limit: int = 100):
 
     async def fetch(client, worker_id, info):
         try:
-            resp = await client.get(f"{info['endpoint']}/events")
+            resp = await client.get(f"{info['endpoint']}/events", headers=_peer_headers("GET", "/events"))
             resp.raise_for_status()
             data = resp.json()
             events = data.get("events", []) if isinstance(data, dict) else data
@@ -258,6 +269,13 @@ def list_hotels(q: str = "", limit: int = 50, db: Session = Depends(get_db)):
     if q.strip():
         query = query.filter(Hotel.name.ilike(f"%{q.strip()}%"))
     rows = query.order_by(Hotel.review_count.desc().nullslast()).limit(limit).all()
+    return [_hotel_to_dict(h) for h in rows]
+
+@app.get("/internal/hotels")
+def internal_hotels(request: Request, limit: int = 5, db: Session = Depends(get_db)):
+    """Catalogo para os workers (agendador de varreduras). Autenticado por assinatura HMAC de servico, nao por JWT."""
+    check_service_headers(request.headers, request.headers.get("X-Service-Id", ""), "internal:hotels")
+    rows = db.query(Hotel).order_by(Hotel.review_count.desc().nullslast()).limit(max(1, min(limit, 50))).all()
     return [_hotel_to_dict(h) for h in rows]
 
 @app.post("/hotels/refresh", dependencies=ADMIN)
@@ -404,7 +422,7 @@ async def dispatch_job(req: TriggerJobRequest, db: Session = Depends(get_db)):
                 sent = EVENTS.log("dispatch_sent", job_id=job_id, hotel_key=hotel_key, worker=selected_id)
                 async with httpx.AsyncClient(timeout=15.0) as client:
                     response = await client.post(f"{target_url}/scrape", json=payload,
-                                                 headers={"X-Lamport": str(sent["lamport"])})
+                                                 headers=_peer_headers("POST", "/scrape", {"X-Lamport": str(sent["lamport"])}))
             except httpx.RequestError as exc:
                 breaker.record_failure()
                 failure = (503, f"Falha ao conectar ao Worker ({target_url}): {str(exc)}")

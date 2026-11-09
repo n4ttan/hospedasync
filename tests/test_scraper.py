@@ -5,7 +5,7 @@ from pathlib import Path
 
 import httpx
 import pytest
-from fastapi.testclient import TestClient
+from conftest import SignedClient as TestClient
 
 WORKERS = Path(__file__).resolve().parent.parent / "workers"
 BODY = {"job_id": "j1", "hotel_key": "g1-d1", "hotel_name": "Hotel X",

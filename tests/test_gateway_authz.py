@@ -58,3 +58,27 @@ def test_registry_accepts_signed_node(real_app):
     with TestClient(real_app.app) as c:
         r = c.post("/registry/register", json=body, headers=signed_headers("w9", "http://w9:8001"))
     assert r.status_code == 200 and "w9" in real_app.ACTIVE_WORKERS
+
+
+def test_internal_hotels_requires_service_signature(real_app):
+    import database
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import StaticPool
+    eng = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    database.Base.metadata.create_all(bind=eng)
+    S = sessionmaker(bind=eng)
+
+    def _db():
+        s = S()
+        try:
+            yield s
+        finally:
+            s.close()
+
+    real_app.app.dependency_overrides[real_app.get_db] = _db
+    with TestClient(real_app.app) as c:
+        assert c.get("/internal/hotels").status_code == 401                      # anonimo
+        assert c.get("/internal/hotels", headers=signed_headers("w1", "outro-endpoint")).status_code == 401
+        ok = c.get("/internal/hotels?limit=3", headers=signed_headers("w1", "internal:hotels"))
+    assert ok.status_code == 200 and isinstance(ok.json(), list)

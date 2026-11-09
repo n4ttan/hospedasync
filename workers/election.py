@@ -5,10 +5,12 @@ import asyncio
 from urllib.parse import urlparse
 
 import httpx
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from lamport import EventLog
+import servicetoken
+from security import require_peer
 
 router = APIRouter()
 
@@ -39,6 +41,13 @@ def parse_peer(entry: str):
     if m:
         return int(m.group(1)), m.group(2).strip()
     return extract_id_from_url(entry), entry
+
+
+def _sig(method: str, path: str) -> dict:
+    """Headers HMAC para chamadas worker->worker (id = WORKER_ID)."""
+    secret = os.getenv("SERVICE_SECRET", "")
+    # sem secret nao assina: o peer rejeita com 401 (falha fechada, sem derrubar a eleicao)
+    return servicetoken.sign_request(secret, WORKER_ID, method, path) if secret else {}
 
 
 def derive_my_id(worker_id, self_url: str) -> int:
@@ -90,7 +99,7 @@ class CoordinatorRequest(BaseModel):
     lamport: int = 0
 
 
-@router.post("/election")
+@router.post("/election", dependencies=[Depends(require_peer)])
 async def receive_election(payload: ElectionRequest):
     EVENTS.log("election_received", received=payload.lamport, candidate_id=payload.candidate_id)
     if MY_ID > payload.candidate_id:
@@ -100,7 +109,7 @@ async def receive_election(payload: ElectionRequest):
     return {"status": "IGNORED", "reason": "responder_id menor ou igual ao candidate_id", "lamport": CLOCK.tick()}
 
 
-@router.post("/coordinator")
+@router.post("/coordinator", dependencies=[Depends(require_peer)])
 async def receive_coordinator(payload: CoordinatorRequest):
     global CURRENT_LEADER_ID
     last_term = _last_coordinator_term_by_leader.get(payload.leader_id, -1)
@@ -114,12 +123,12 @@ async def receive_coordinator(payload: CoordinatorRequest):
     return {"status": "ACK", "worker_id": MY_ID, "lamport": CLOCK.tick()}
 
 
-@router.get("/leader")
+@router.get("/leader", dependencies=[Depends(require_peer)])
 async def get_leader():
     return {"leader_id": CURRENT_LEADER_ID, "am_i_leader": CURRENT_LEADER_ID == MY_ID}
 
 
-@router.get("/events")
+@router.get("/events", dependencies=[Depends(require_peer)])
 async def get_events():
     return {"node": WORKER_ID, "lamport": CLOCK.time, "events": EVENTS.snapshot()}
 
@@ -135,7 +144,7 @@ async def become_leader(term: float):
                 continue
             try:
                 resp = await client.post(
-                    f"{url}/coordinator", json={"leader_id": MY_ID, "term": term, "lamport": CLOCK.tick()}
+                    f"{url}/coordinator", headers=_sig("POST", "/coordinator"), json={"leader_id": MY_ID, "term": term, "lamport": CLOCK.tick()}
                 )
                 try:
                     CLOCK.update(resp.json().get("lamport", 0))
@@ -174,7 +183,7 @@ async def start_election():
         got_ok = False
         async with httpx.AsyncClient(timeout=ELECTION_TIMEOUT) as client:
             tasks = [
-                client.post(f"{url}/election", json={"candidate_id": MY_ID, "term": my_term, "lamport": CLOCK.tick()})
+                client.post(f"{url}/election", headers=_sig("POST", "/election"), json={"candidate_id": MY_ID, "term": my_term, "lamport": CLOCK.tick()})
                 for url in higher_peers.values()
             ]
             results = await asyncio.gather(*tasks, return_exceptions=True)
