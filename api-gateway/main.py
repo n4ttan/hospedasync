@@ -77,6 +77,19 @@ def register_worker(req: RegisterWorkerRequest):
     }
     return {"status": "REGISTERED", "worker_id": req.worker_id}
 
+@app.get("/registry/nodes")
+def get_registered_nodes():
+    """Retorna os nós ativos registrados no Service Registry em tempo real (para a apresentação do Rafael)"""
+    now = time.time()
+    valid_workers = {
+        k: v for k, v in ACTIVE_WORKERS.items() 
+        if now - v["last_seen"] < 15
+    }
+    return {
+        "active_nodes": valid_workers,
+        "count": len(valid_workers)
+    }
+
 @app.get("/history")
 def get_history(db: Session = Depends(get_db)):
     """Retorna o histórico persistido no banco de dados"""
