@@ -343,7 +343,8 @@ exp4() {
 # ================================================================ EXPERIMENTO 5
 X_OFFSET=0
 fresh_body() {  # data nova a cada chamada: nunca atinge o cache TTL (300 s) da Xotelo
-  X_OFFSET=$((X_OFFSET + 1))
+  # contador em arquivo: $(...) roda em subshell e perderia um contador em variavel
+  X_OFFSET=$(( $(cat "$X_CF") + 1 )); echo "$X_OFFSET" > "$X_CF"
   local ci co; ci=$(date -d "+$((X_BASE + X_OFFSET)) days" +%F); co=$(date -d "+$((X_BASE + X_OFFSET + 2)) days" +%F)
   printf '{"hotel_key":"%s","checkin_date":"%s","checkout_date":"%s"}' "$HK" "$ci" "$co"
 }
@@ -358,7 +359,7 @@ exp5() {
   login
   HK=$(api "$GW/hotels?limit=1" | pyj 'd[0]["hotel_key"]')
   [ -n "$HK" ] || { veredito 5 FAIL "catalogo de hoteis vazio ou inacessivel"; return; }
-  X_BASE=$((150 + RANDOM % 150)); X_OFFSET=0
+  X_BASE=$((60 + RANDOM % 120)); X_CF=$(mktemp); echo 0 > "$X_CF"
   obs "pre-condicao: consulta ao vivo do hotel $HK (grava a cotacao no banco para o fallback)"
   local o; o=$(dispatch_fresh); info "dispatch -> $o"
   if [ "$o" != "SUCCESS live" ]; then veredito 5 FAIL "pre-condicao falhou ($o): Xotelo real inacessivel antes da injecao?"; return; fi
@@ -368,17 +369,18 @@ exp5() {
     docker exec -u root "$c" sh -c 'echo "127.0.0.1 data.xotelo.com" >> /etc/hosts' >/dev/null 2>&1 \
       || warn "nao foi possivel editar /etc/hosts em $c"
   done
-  obs "abrindo o breaker: chamadas diretas a cada worker (/scrape) ate 502 com circuit_open (5 falhas, recovery 30 s)"
-  local p n opened=0 body
-  for p in 8001 8002 8003; do
-    n=0
-    while [ $n -lt 8 ]; do
-      n=$((n + 1))
-      body=$(curl -s -m 30 -X POST "http://localhost:$p/scrape" -H 'Content-Type: application/json' \
-        -d "$(fresh_body | python3 -c 'import sys,json;d=json.load(sys.stdin);d["job_id"]="chaos-%d"%__import__("time").time_ns();print(json.dumps(d))')")
-      case "$body" in *circuit_open*) opened=$((opened + 1)); info "worker :$p breaker ABERTO apos $n chamadas"; break;; esac
+  obs "abrindo o breaker: dispatches pelo gateway com datas novas ate os workers reportarem breaker aberto (limiar 5 falhas por worker)"
+  local p n opened=0 st
+  n=0
+  while [ $n -lt 30 ] && [ $opened -lt 3 ]; do
+    n=$((n + 1)); dispatch_fresh >/dev/null
+    opened=0
+    for p in 8001 8002 8003; do
+      st=$(curl -s -m 5 "http://localhost:$p/health" | pyj 'd.get("xotelo_breaker",{}).get("state","?")')
+      [ "$st" = "open" ] && opened=$((opened + 1))
     done
   done
+  info "breakers abertos: $opened/3 apos $n dispatches"
   local deg; deg=$(dispatch_fresh); info "dispatch pelo gateway com Xotelo fora -> $deg"
   local t_block=$SECONDS
   rec "removendo a linha de /etc/hosts e esperando o breaker (recovery 30 s) voltar a live"

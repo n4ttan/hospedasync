@@ -77,3 +77,19 @@ def test_metrics_endpoint_exposes_counters_and_breakers(gw, monkeypatch):
         text = c.get("/metrics").text
     assert "hospeda_dispatch_total 1" in text and "hospeda_workers_active 1" in text
     assert 'hospeda_worker_breaker_state{worker="m1"} 0' in text
+
+
+def test_worker_502_upstream_outage_does_not_open_gateway_breaker(gw, monkeypatch):
+    """502 do worker = fonte de precos fora (worker vivo). Nao pode contar como falha do worker no gateway."""
+    async def handler(request: httpx.Request):
+        return httpx.Response(502, json={"detail": {"error": "upstream_unavailable"}})
+
+    monkeypatch.setattr(gw.httpx, "AsyncClient",
+                        lambda *a, **kw: RealAsyncClient(*a, transport=httpx.MockTransport(handler),
+                                                         **{k: v for k, v in kw.items() if k != "transport"}))
+    with TestClient(gw.app) as c:
+        register(c, "w-up")
+        for i in range(6):
+            r = c.post("/jobs/dispatch", json=body(f"Hotel U{i}"))
+            assert r.status_code == 503  # sem cache previo: erro claro
+    assert gw._breaker("w-up").state == "closed"

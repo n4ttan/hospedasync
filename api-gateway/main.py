@@ -432,8 +432,9 @@ async def dispatch_job(req: TriggerJobRequest, db: Session = Depends(get_db)):
             EVENTS.log("dispatch_done", received=response.headers.get("X-Lamport"),
                        job_id=job_id, worker=selected_id, http_status=response.status_code)
             if response.status_code in (502, 503):
-                # 502/503 do worker = fonte de precos fora; tentar outro worker nao ajuda, mas conta para o breaker
-                breaker.record_failure()
+                # 502/503 do worker = fonte de precos fora (o worker esta vivo e respondeu). Isso NAO e falha do
+                # worker: quem protege contra a fonte e o breaker da Xotelo dentro do worker. Tentar outro worker nao ajuda.
+                breaker.record_success()
                 failure = (503, f"Worker indisponivel ou fonte de precos fora do ar (HTTP {response.status_code}).")
                 break
             breaker.record_success()

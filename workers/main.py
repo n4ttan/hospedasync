@@ -82,7 +82,7 @@ async def send_periodic_heartbeat():
 @app.get("/health")
 def health():
     return {"status": "UP", "worker_id": WORKER_ID, "leader_id": election.CURRENT_LEADER_ID,
-            "lamport": election.CLOCK.time}
+            "lamport": election.CLOCK.time, "xotelo_breaker": scraper.breaker_state()}
 
 @app.post("/scrape", dependencies=[Depends(require_peer)])
 async def execute_scrape(req: ScrapeRequest, request: Request, response: Response):
