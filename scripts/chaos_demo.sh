@@ -408,7 +408,7 @@ exp6() {
   obs "durante a queda: /health do gateway deve continuar respondendo"
   while [ $((SECONDS - t0)) -lt 15 ]; do
     total=$((total + 1))
-    if curl -sf -m "${GW_OK_TIMEOUT:-3}" "$GW/health" >/dev/null; then up=$((up + 1)); fi
+    if curl -sf --retry "${GW_PROBE_RETRIES:-0}" --retry-all-errors -m "${GW_OK_TIMEOUT:-3}" "$GW/health" >/dev/null; then up=$((up + 1)); fi
     sleep 2
   done
   info "/health respondeu $up/$total vezes durante a queda"

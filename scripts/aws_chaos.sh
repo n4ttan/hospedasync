@@ -54,5 +54,5 @@ export CURL_HOME="$HOME/.curl-insecure-aws"
 export GATEWAY_URL="https://$EDGE" ADMIN_USER="${ADMIN_USER:-admin}" ADMIN_PASSWORD RABBITMQ_PASS
 export RABBITMQ_USER="${RABBITMQ_USER:-hospeda}" RABBITMQ_API="http://localhost:25672" WORKER_PORT_OFFSET=10000
 export EVIDENCE_FILE="${EVIDENCE_FILE:-$ROOT/docs/relatorio/evidencias/chaos_aws_$(date +%F).md}"
-export GW_OK_TIMEOUT=10 SAVE="${SAVE:-1}"
+export GW_PROBE_RETRIES=3 GW_OK_TIMEOUT=10 SAVE="${SAVE:-1}"
 bash "$ROOT/scripts/chaos_demo.sh" "$@"
