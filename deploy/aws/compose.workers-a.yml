@@ -1,0 +1,88 @@
+# EC2-2 "workers-a": worker-01, worker-02 e postgres-db (primario).
+# Uso (na raiz do repo):  docker compose -f deploy/aws/compose.workers-a.yml --env-file .env.aws up --build -d
+# Suba esta maquina PRIMEIRO (o Postgres precisa existir antes da replica e do gateway).
+x-worker: &worker
+  build:
+    context: ../..
+    dockerfile: workers/Dockerfile
+  restart: unless-stopped
+  healthcheck:
+    test: ["CMD-SHELL", "python -c \"import os,urllib.request; urllib.request.urlopen('http://localhost:%s/health' % os.environ['PORT'], timeout=3)\""]
+    interval: 10s
+    timeout: 5s
+    retries: 6
+    start_period: 20s
+  networks:
+    - hospeda-net
+
+services:
+  postgres-db:
+    restart: unless-stopped
+    image: postgres:15-alpine
+    container_name: hospeda_db
+    environment:
+      POSTGRES_DB: hospedasync_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina no .env.aws}
+      REPLICATOR_PASSWORD: ${REPLICATOR_PASSWORD:?defina no .env.aws}
+    command: >
+      postgres
+      -c wal_level=replica
+      -c max_wal_senders=10
+      -c max_replication_slots=10
+      -c hot_standby=on
+      -c wal_keep_size=256MB
+    ports:
+      - "${WA_IP:?defina WA_IP}:5432:5432"
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../postgres/01-replicator.sh:/docker-entrypoint-initdb.d/01-replicator.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d hospedasync_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - hospeda-net
+
+  worker-01:
+    <<: *worker
+    container_name: hospeda_worker_01
+    ports:
+      - "${WA_IP}:8001:8001"
+      - "127.0.0.1:8001:8001"
+    environment:
+      - GATEWAY_URL=http://${EDGE_IP:?defina EDGE_IP}:8000
+      - WORKER_ID=worker-01
+      - PORT=8001
+      - SELF_URL=http://${WA_IP}:8001
+      - PEER_WORKERS=2=http://${WA_IP}:8002,3=http://${WB_IP:?defina WB_IP}:8003
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?defina no .env.aws}@${EDGE_IP}:6379/0
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-hospeda}:${RABBITMQ_PASS:?defina no .env.aws}@${EDGE_IP}:5672/
+      - SWEEP_INTERVAL_SECONDS=${SWEEP_INTERVAL_SECONDS:-120}
+      - SERVICE_SECRET=${SERVICE_SECRET:?defina no .env.aws}
+
+  worker-02:
+    <<: *worker
+    container_name: hospeda_worker_02
+    ports:
+      - "${WA_IP}:8002:8002"
+      - "127.0.0.1:8002:8002"
+    environment:
+      - GATEWAY_URL=http://${EDGE_IP}:8000
+      - WORKER_ID=worker-02
+      - PORT=8002
+      - SELF_URL=http://${WA_IP}:8002
+      - PEER_WORKERS=1=http://${WA_IP}:8001,3=http://${WB_IP}:8003
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@${EDGE_IP}:6379/0
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-hospeda}:${RABBITMQ_PASS}@${EDGE_IP}:5672/
+      - SWEEP_INTERVAL_SECONDS=${SWEEP_INTERVAL_SECONDS:-120}
+      - SERVICE_SECRET=${SERVICE_SECRET}
+
+networks:
+  hospeda-net:
+    driver: bridge
+
+volumes:
+  postgres_data:

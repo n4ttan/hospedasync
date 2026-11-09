@@ -6,3 +6,7 @@ sqlalchemy
 psycopg2-binary
 psycopg[binary]
 redis
+aio-pika
+
+argon2-cffi
+PyJWT

@@ -14,7 +14,7 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://redis-lock:6379/0")
 LOCK_PREFIX = "lock:hospedasync:"
 DEFAULT_TTL = 15
 
-_client = redis.Redis.from_url(REDIS_URL, decode_responses=True)
+_client = redis.Redis.from_url(REDIS_URL, decode_responses=True, socket_timeout=3, socket_connect_timeout=3)
 
 # Script Lua para liberacao atomica: so remove a chave se o valor
 # armazenado ainda for igual ao owner_id informado. Isso evita que um
@@ -69,6 +69,18 @@ def is_locked(resource_name: str) -> bool:
     """Uso de diagnostico: informa se o recurso esta atualmente travado."""
     key = _lock_key(resource_name)
     return bool(_client.exists(key))
+
+
+def list_locks() -> list:
+    """Diagnostico: lista os locks ativos (hotel, dono e TTL restante em segundos)."""
+    locks = []
+    for key in _client.scan_iter(match=f"{LOCK_PREFIX}*"):
+        locks.append({
+            "resource": key[len(LOCK_PREFIX):],
+            "owner": _client.get(key),
+            "ttl_seconds": _client.ttl(key),
+        })
+    return locks
 
 
 def check_connection() -> bool:

@@ -28,7 +28,7 @@
                 <div class="hidden md:flex items-center space-x-5 text-xs text-[#8b949e] border-r border-[#30363d] pr-6">
                     <div>
                         <span class="text-[#6e7681] block">Região</span>
-                        <span class="text-[#c9d1d9] font-medium">Poços de Caldas, BR</span>
+                        <span class="text-[#c9d1d9] font-medium">Rio de Janeiro, BR</span>
                     </div>
                     <div>
                         <span class="text-[#6e7681] block">Orquestração</span>
@@ -38,11 +38,44 @@
 
                 <div class="flex items-center gap-2 bg-[#21262d] border border-[#30363d] px-3.5 py-1.5 rounded-lg shadow-sm">
                     <span class="h-2 w-2 rounded-full bg-[#3fb950] animate-pulse"></span>
-                    <span class="text-xs text-[#c9d1d9] font-mono">Cluster: <strong class="text-[#3fb950] font-normal">Active</strong></span>
+                    <span class="text-xs text-[#c9d1d9] font-mono" id="leaderBadge">Líder: <strong class="text-[#3fb950] font-normal">verificando...</strong></span>
+                </div>
+
+                <div id="userBox" class="hidden items-center gap-3 pl-6 border-l border-[#30363d]">
+                    <div class="text-xs leading-tight text-right">
+                        <span id="userName" class="block text-[#c9d1d9] font-medium"></span>
+                        <span id="userRole" class="block text-[10px] font-mono text-[#8b949e] uppercase"></span>
+                    </div>
+                    <button id="logoutBtn" type="button" class="text-xs bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-[#c9d1d9] px-3 py-1.5 rounded-lg transition">Sair</button>
                 </div>
             </div>
         </div>
     </header>
+
+    <!-- Aviso (toast) -->
+    <div id="toast" class="hidden fixed top-20 right-6 z-[90] max-w-sm bg-[#9e6a03]/20 border border-[#9e6a03]/40 text-[#d29922] px-4 py-2.5 rounded-lg text-xs shadow-lg" role="alert"></div>
+
+    <!-- Tela de login -->
+    <div id="loginOverlay" class="hidden fixed inset-0 z-[100] bg-[#0d1117] items-center justify-center px-6">
+        <form id="loginForm" class="w-full max-w-sm bg-[#161b22] border border-[#30363d] rounded-xl shadow-lg p-6 space-y-4" autocomplete="on">
+            <div class="border-b border-[#30363d] pb-3">
+                <h2 class="text-base font-bold text-white tracking-tight">HospedaSync</h2>
+                <p class="text-xs text-[#8b949e] mt-0.5">Entre para acessar o painel do cluster.</p>
+            </div>
+            <div>
+                <label for="loginUser" class="block text-xs font-medium text-[#c9d1d9] mb-1.5">Usuário</label>
+                <input type="text" id="loginUser" required autocomplete="username"
+                       class="w-full bg-[#21262d] border border-[#30363d] rounded-lg px-3.5 py-2 text-white text-sm focus:outline-none focus:border-[#1f6feb] transition">
+            </div>
+            <div>
+                <label for="loginPass" class="block text-xs font-medium text-[#c9d1d9] mb-1.5">Senha</label>
+                <input type="password" id="loginPass" required autocomplete="current-password"
+                       class="w-full bg-[#21262d] border border-[#30363d] rounded-lg px-3.5 py-2 text-white text-sm focus:outline-none focus:border-[#1f6feb] transition">
+            </div>
+            <div id="loginError" class="hidden bg-[#f85149]/10 border border-[#f85149]/30 text-[#f85149] p-3 rounded-lg text-xs" role="alert"></div>
+            <button type="submit" id="loginBtn" class="w-full bg-[#238636] hover:bg-[#2ea043] disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg shadow transition text-xs">Entrar</button>
+        </form>
+    </div>
 
     <!-- Main Workspace -->
     <main class="max-w-7xl mx-auto px-6 py-8 w-full flex-1 space-y-8">
@@ -56,9 +89,9 @@
             
             <div class="flex items-center gap-2">
                 <span class="text-xs text-[#6e7681] font-medium">Atalhos:</span>
-                <button onclick="setHotel('Hotel Palace Poços')" class="text-xs bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-[#c9d1d9] px-3 py-1.5 rounded-lg transition">Hotel Palace</button>
-                <button onclick="setHotel('Hotel Nacional Inn')" class="text-xs bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-[#c9d1d9] px-3 py-1.5 rounded-lg transition">Nacional Inn</button>
-                <button onclick="setHotel('Thermas Resort')" class="text-xs bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-[#c9d1d9] px-3 py-1.5 rounded-lg transition">Thermas Resort</button>
+                <button onclick="setHotel('Copacabana')" class="text-xs bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-[#c9d1d9] px-3 py-1.5 rounded-lg transition">Copacabana</button>
+                <button onclick="setHotel('Ipanema')" class="text-xs bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-[#c9d1d9] px-3 py-1.5 rounded-lg transition">Ipanema</button>
+                <button onclick="setHotel('Hilton')" class="text-xs bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-[#c9d1d9] px-3 py-1.5 rounded-lg transition">Hilton</button>
             </div>
         </div>
 
@@ -112,10 +145,12 @@
                 </div>
                 
                 <form id="dispatchForm" class="space-y-4">
-                    <div>
+                    <div class="relative">
                         <label class="block text-xs font-medium text-[#c9d1d9] mb-1.5">Hotel Concorrente</label>
-                        <input type="text" id="hotelName" required value="Hotel Palace Poços" 
+                        <input type="text" id="hotelName" required autocomplete="off" placeholder="Digite para buscar um hotel..."
                                class="w-full bg-[#21262d] border border-[#30363d] rounded-lg px-3.5 py-2 text-white text-sm focus:outline-none focus:border-[#1f6feb] transition">
+                        <p id="hotelSelected" class="hidden text-[11px] text-[#3fb950] mt-1"></p>
+                        <ul id="hotelSuggestions" class="hidden absolute z-40 left-0 right-0 mt-1 max-h-64 overflow-y-auto bg-[#161b22] border border-[#30363d] rounded-lg shadow-lg divide-y divide-[#30363d]/60"></ul>
                     </div>
 
                     <div class="grid grid-cols-2 gap-3">
@@ -147,6 +182,23 @@
                 </form>
 
                 <div id="errorBox" class="hidden bg-[#f85149]/10 border border-[#f85149]/30 text-[#f85149] p-3 rounded-lg text-xs"></div>
+
+                <div id="resultPanel" class="hidden border-t border-[#30363d] pt-4 space-y-3">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span id="resultBadge"></span>
+                        <span id="resultHotel" class="text-xs font-semibold text-white"></span>
+                    </div>
+                    <div id="persistWarn" class="hidden bg-[#9e6a03]/15 border border-[#9e6a03]/30 text-[#d29922] p-2.5 rounded-lg text-[11px]">
+                        Resultado não foi persistido no histórico (banco indisponível).
+                    </div>
+                    <table class="w-full text-left text-xs">
+                        <thead class="text-[10px] text-[#8b949e] uppercase border-b border-[#30363d]">
+                            <tr><th class="py-2 pr-2 font-semibold">OTA</th><th class="py-2 text-right font-semibold">Preço (diária)</th></tr>
+                        </thead>
+                        <tbody id="ratesBody" class="divide-y divide-[#30363d]/60"></tbody>
+                    </table>
+                    <a id="resultLink" href="#" target="_blank" rel="noopener noreferrer" class="hidden inline-block text-xs text-[#58a6ff] hover:underline">Ver no TripAdvisor &rarr;</a>
+                </div>
             </div>
 
             <!-- Analytics Chart -->
@@ -162,6 +214,58 @@
                 <div class="relative w-full h-[270px] pt-2">
                     <canvas id="rateChart"></canvas>
                 </div>
+            </div>
+        </section>
+
+        <!-- Saúde do Cluster + Varredura -->
+        <section class="grid lg:grid-cols-3 gap-8 items-start">
+            <div class="lg:col-span-2 bg-[#0d1117] border border-[#30363d] p-6 rounded-xl shadow-sm space-y-4">
+                <div class="flex justify-between items-center border-b border-[#30363d] pb-3">
+                    <div>
+                        <h2 class="text-sm font-bold text-white">Saúde do Cluster</h2>
+                        <p class="text-xs text-[#8b949e]">Atualizado a cada 5 s.</p>
+                    </div>
+                    <span id="clusterStamp" class="text-[10px] bg-[#21262d] text-[#8b949e] border border-[#30363d] px-2.5 py-1 rounded font-mono">--</span>
+                </div>
+                <div id="clusterGateway" class="flex flex-wrap gap-2 text-[11px] font-mono"></div>
+                <div>
+                    <h3 class="text-[11px] text-[#8b949e] uppercase font-semibold mb-2">Nós registrados</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead class="text-[10px] text-[#8b949e] uppercase border-b border-[#30363d]">
+                                <tr><th class="py-2 pr-2 font-semibold">Worker</th><th class="py-2 pr-2 font-semibold">Endpoint</th><th class="py-2 text-right font-semibold">Heartbeat</th></tr>
+                            </thead>
+                            <tbody id="clusterNodes" class="divide-y divide-[#30363d]/60 font-mono"></tbody>
+                        </table>
+                    </div>
+                    <p id="clusterNodesErr" class="hidden text-[11px] text-[#f85149] mt-2"></p>
+                </div>
+                <div id="clusterAdmin" class="hidden space-y-3 border-t border-[#30363d] pt-4">
+                    <div id="clusterCoord" class="flex flex-wrap gap-2 text-[11px] font-mono"></div>
+                    <div>
+                        <h3 class="text-[11px] text-[#8b949e] uppercase font-semibold mb-2">Visões dos workers (quem é o líder)</h3>
+                        <div id="clusterViews" class="flex flex-wrap gap-2 text-[11px] font-mono"></div>
+                    </div>
+                    <div>
+                        <h3 class="text-[11px] text-[#8b949e] uppercase font-semibold mb-2">Locks ativos</h3>
+                        <div id="clusterLocks" class="text-xs font-mono space-y-1"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-[#0d1117] border border-[#30363d] p-6 rounded-xl shadow-sm space-y-4">
+                <div class="border-b border-[#30363d] pb-3">
+                    <h2 class="text-sm font-bold text-white">Varredura em lote</h2>
+                    <p class="text-xs text-[#8b949e] mt-0.5">Top 5 hotéis, check-in em +7 e +14 dias.</p>
+                </div>
+                <button id="sweepBtn" type="button" class="w-full bg-[#1f6feb] hover:bg-[#388bfd] disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg shadow transition text-xs">Disparar varredura</button>
+                <div id="sweepBox" class="hidden space-y-2">
+                    <div class="h-2 w-full bg-[#21262d] rounded-full overflow-hidden">
+                        <div id="sweepBar" class="h-full bg-[#3fb950] transition-all duration-300" style="width:0%"></div>
+                    </div>
+                    <p id="sweepText" class="text-[11px] text-[#8b949e] font-mono"></p>
+                </div>
+                <div id="sweepError" class="hidden bg-[#f85149]/10 border border-[#f85149]/30 text-[#f85149] p-3 rounded-lg text-xs"></div>
             </div>
         </section>
 
@@ -201,14 +305,328 @@
     <!-- Footer -->
     <footer class="border-t border-[#30363d] py-4 text-center text-xs text-[#8b949e]">
         HospedaSync &copy; 2026 — Arquitetura Orientada a Microsserviços
+        <p class="mt-1 text-[11px] text-[#6e7681]">Fonte dos preços: Xotelo (dados TripAdvisor) · consulta em tempo real</p>
     </footer>
 
     <!-- Script de Integração -->
     <script>
         let historyData = [];
 
+        let selectedHotel = null;   // {hotel_key, name, ...}
+        let searchTimer = null;
+        let searchSeq = 0;
+
+        const hotelInput = document.getElementById('hotelName');
+        const sugBox = document.getElementById('hotelSuggestions');
+        const selLabel = document.getElementById('hotelSelected');
+
+        function esc(v) {
+            return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        }
+        function brl(n) {
+            return 'R$ ' + Number(n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+        function fmtDate(iso) {
+            if (!iso) return '';
+            const d = new Date(iso);
+            return isNaN(d) ? String(iso) : d.toLocaleString('pt-BR');
+        }
+
+        // ---------- Autenticação (JWT em sessionStorage) ----------
+        const AUTH_KEY = 'hs_auth';
+        let auth = null;            // {token, exp (ms), username, role}
+        let memAuth = null;         // fallback quando sessionStorage está indisponível
+        let expiryTimer = null;
+        let pollTimer = null;
+        let sweepTimer = null;
+        let toastTimer = null;
+        let loginCountdown = null;
+
+        function loadAuth() {
+            let raw = null;
+            try { raw = sessionStorage.getItem(AUTH_KEY); } catch (_) { return memAuth; }
+            if (!raw) return memAuth;
+            try {
+                const a = JSON.parse(raw);
+                return a && typeof a.token === 'string' && Number(a.exp) > Date.now() ? a : null;
+            } catch (_) { return null; }
+        }
+        function saveAuth(a) {
+            memAuth = a;
+            try { sessionStorage.setItem(AUTH_KEY, JSON.stringify(a)); } catch (_) { /* só em memória */ }
+        }
+        function clearAuth() {
+            memAuth = null;
+            try { sessionStorage.removeItem(AUTH_KEY); } catch (_) {}
+        }
+        function authValid() { return !!auth && auth.exp > Date.now(); }
+        function isAdmin() { return !!auth && auth.role === 'admin'; }
+
+        function toast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.classList.remove('hidden');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => t.classList.add('hidden'), 4000);
+        }
+
+        class AuthError extends Error {}
+
+        // Único ponto de acesso à API: injeta o token e trata 401/403.
+        async function api(path, opts = {}) {
+            const { noAuth, ...init } = opts;
+            const headers = new Headers(init.headers || {});
+            if (!noAuth) {
+                if (!authValid()) { logout('Sessão expirada. Entre novamente.'); throw new AuthError('sessão expirada'); }
+                headers.set('Authorization', 'Bearer ' + auth.token);
+            }
+            init.headers = headers;
+            const res = await fetch(path, init);
+            if (res.status === 401 && !noAuth) {
+                logout('Sessão expirada ou inválida. Entre novamente.');
+                throw new AuthError('não autorizado');
+            }
+            if (res.status === 403) toast('Sem permissão para esta ação.');
+            return res;
+        }
+
+        function stopLoops() {
+            clearTimeout(expiryTimer); expiryTimer = null;
+            clearInterval(pollTimer); pollTimer = null;
+            clearInterval(sweepTimer); sweepTimer = null;
+        }
+
+        function resetData() {
+            historyData = [];
+            selectedHotel = null;
+            hotelInput.value = '';
+            sugBox.classList.add('hidden');
+            selLabel.classList.add('hidden');
+            document.getElementById('resultPanel').classList.add('hidden');
+            document.getElementById('errorBox').classList.add('hidden');
+            document.getElementById('historyTable').innerHTML = '<tr id="emptyTableMsg"><td colspan="6" class="py-10 text-center text-[#8b949e] font-sans">Nenhum job executado nesta sessão.</td></tr>';
+            ['kpiTotal'].forEach(id => document.getElementById(id).textContent = '0');
+            document.getElementById('kpiAvg').textContent = 'R$ 0,00';
+            document.getElementById('kpiMin').textContent = 'R$ 0,00';
+            document.getElementById('kpiLatency').textContent = '0 ms';
+            updateChart();
+            document.getElementById('sweepBox').classList.add('hidden');
+            document.getElementById('sweepError').classList.add('hidden');
+            document.getElementById('sweepBtn').disabled = false;
+            document.getElementById('clusterNodes').innerHTML = '';
+            document.getElementById('clusterGateway').innerHTML = '';
+            document.getElementById('clusterStamp').textContent = '--';
+        }
+
+        function showLogin(msg) {
+            const ov = document.getElementById('loginOverlay');
+            ov.classList.remove('hidden'); ov.classList.add('flex');
+            document.getElementById('userBox').classList.add('hidden');
+            document.getElementById('userBox').classList.remove('flex');
+            document.getElementById('leaderBadge').innerHTML = 'Líder: <strong class="text-[#8b949e] font-normal">--</strong>';
+            document.getElementById('loginPass').value = '';
+            setLoginError(msg || '');
+            setTimeout(() => document.getElementById('loginUser').focus(), 0);
+        }
+        function setLoginError(msg) {
+            const box = document.getElementById('loginError');
+            box.textContent = msg || '';
+            box.classList.toggle('hidden', !msg);
+        }
+
+        function logout(msg) {
+            auth = null;
+            clearAuth();
+            stopLoops();
+            resetData();
+            showLogin(msg);
+        }
+
+        function startSession() {
+            const ov = document.getElementById('loginOverlay');
+            ov.classList.add('hidden'); ov.classList.remove('flex');
+            const ub = document.getElementById('userBox');
+            ub.classList.remove('hidden'); ub.classList.add('flex');
+            document.getElementById('userName').textContent = auth.username || '';
+            document.getElementById('userRole').textContent = auth.role || '';
+            document.getElementById('clusterAdmin').classList.toggle('hidden', !isAdmin());
+            clearTimeout(expiryTimer);
+            expiryTimer = setTimeout(() => logout('Sessão expirada. Entre novamente.'), Math.max(0, auth.exp - Date.now()));
+            loadHistory();
+            pollLeader();
+            clearInterval(pollTimer);
+            pollTimer = setInterval(pollLeader, 5000);
+        }
+
+        function parseRetryAfter(res) {
+            const n = parseInt(res.headers.get('Retry-After'), 10);
+            return Number.isFinite(n) && n > 0 ? n : 30;
+        }
+
+        function lockLogin(seconds) {
+            const btn = document.getElementById('loginBtn');
+            clearInterval(loginCountdown);
+            let left = seconds;
+            btn.disabled = true;
+            const tick = () => {
+                if (left <= 0) {
+                    clearInterval(loginCountdown);
+                    btn.disabled = false; setLoginError('');
+                    return;
+                }
+                setLoginError(`Muitas tentativas, aguarde ${left} s.`);
+                left -= 1;
+            };
+            tick();
+            loginCountdown = setInterval(tick, 1000);
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('loginBtn');
+            const username = document.getElementById('loginUser').value.trim();
+            const password = document.getElementById('loginPass').value;
+            btn.disabled = true; btn.textContent = 'Entrando...';
+            setLoginError('');
+            let locked = false;
+            try {
+                const res = await api('/auth/login', {
+                    method: 'POST', noAuth: true,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                if (res.status === 429) { locked = true; lockLogin(parseRetryAfter(res)); return; }
+                if (res.status === 401) { setLoginError('Usuário ou senha inválidos.'); return; }
+                if (!res.ok) { setLoginError('Não foi possível entrar. Tente novamente em instantes.'); return; }
+                const data = await res.json();
+                const ttl = Number(data.expires_in);
+                if (!data.access_token || !(ttl > 0)) { setLoginError('Resposta de login inválida.'); return; }
+                auth = { token: data.access_token, exp: Date.now() + ttl * 1000, username, role: data.role };
+                try {
+                    const me = await api('/auth/me');
+                    if (me.ok) {
+                        const m = await me.json();
+                        if (m.username) auth.username = m.username;
+                        if (m.role) auth.role = m.role;
+                    }
+                } catch (err) { if (err instanceof AuthError) return; /* mantém dados do login */ }
+                saveAuth(auth);
+                startSession();
+            } catch (err) {
+                if (!(err instanceof AuthError)) setLoginError('Falha ao conectar ao servidor.');
+            } finally {
+                document.getElementById('loginPass').value = '';
+                if (!locked) btn.disabled = false;
+                btn.textContent = 'Entrar';
+            }
+        });
+        document.getElementById('logoutBtn').addEventListener('click', () => logout(''));
+
         function setHotel(name) {
-            document.getElementById('hotelName').value = name;
+            hotelInput.value = name;
+            selectedHotel = null;
+            selLabel.classList.add('hidden');
+            searchHotels(name);
+        }
+
+        function chooseHotel(h) {
+            selectedHotel = h;
+            hotelInput.value = h.name;
+            sugBox.classList.add('hidden');
+            selLabel.textContent = `Selecionado: ${h.name}`;
+            selLabel.classList.remove('hidden');
+        }
+
+        async function searchHotels(q) {
+            q = (q || '').trim();
+            if (q.length < 2) { sugBox.classList.add('hidden'); return; }
+            const seq = ++searchSeq;
+            try {
+                const res = await api(`/hotels?q=${encodeURIComponent(q)}&limit=50`);
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const list = await res.json();
+                if (seq !== searchSeq) return;
+                sugBox.innerHTML = '';
+                if (!Array.isArray(list) || list.length === 0) {
+                    sugBox.innerHTML = '<li class="px-3.5 py-2 text-xs text-[#8b949e]">Nenhum hotel encontrado.</li>';
+                } else {
+                    list.forEach(h => {
+                        const li = document.createElement('li');
+                        li.className = 'px-3.5 py-2 cursor-pointer hover:bg-[#21262d] transition';
+                        const rating = h.rating != null ? `★ ${esc(h.rating)}` : 'sem nota';
+                        const reviews = h.review_count != null ? ` · ${Number(h.review_count).toLocaleString('pt-BR')} avaliações` : '';
+                        li.innerHTML = `<div class="text-xs text-white">${esc(h.name)}</div><div class="text-[11px] text-[#8b949e]">${rating}${reviews}</div>`;
+                        li.addEventListener('mousedown', ev => { ev.preventDefault(); chooseHotel(h); });
+                        sugBox.appendChild(li);
+                    });
+                }
+                sugBox.classList.remove('hidden');
+            } catch (err) {
+                if (err instanceof AuthError) return;
+                if (seq !== searchSeq) return;
+                sugBox.innerHTML = '<li class="px-3.5 py-2 text-xs text-[#f85149]">Falha ao buscar hotéis.</li>';
+                sugBox.classList.remove('hidden');
+            }
+        }
+
+        hotelInput.addEventListener('input', () => {
+            selectedHotel = null;
+            selLabel.classList.add('hidden');
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => searchHotels(hotelInput.value), 300);
+        });
+        hotelInput.addEventListener('blur', () => setTimeout(() => sugBox.classList.add('hidden'), 150));
+
+        function showResult(data) {
+            const r = data.result;
+            const badge = document.getElementById('resultBadge');
+            if (r.source === 'live' && !r.stale) {
+                badge.innerHTML = '<span class="text-[10px] bg-[#238636]/15 text-[#3fb950] border border-[#238636]/30 font-mono px-2 py-0.5 rounded">AO VIVO</span>';
+            } else {
+                badge.innerHTML = `<span class="text-[10px] bg-[#9e6a03]/15 text-[#d29922] border border-[#9e6a03]/30 font-mono px-2 py-0.5 rounded">CACHE · dado de ${esc(fmtDate(r.fetched_at))}</span>`;
+            }
+            document.getElementById('resultHotel').textContent = r.hotel_name || '';
+            document.getElementById('persistWarn').classList.toggle('hidden', data.persisted !== false);
+            const rates = (r.rates || []).slice().sort((a, b) => a.rate - b.rate);
+            const min = rates.length ? rates[0].rate : r.min_rate;
+            document.getElementById('ratesBody').innerHTML = rates.map(x => {
+                const best = x.rate === min;
+                return `<tr><td class="py-2 pr-2 ${best ? 'text-[#3fb950] font-semibold' : 'text-[#c9d1d9]'}">${esc(x.name || x.code)}</td>` +
+                       `<td class="py-2 text-right font-mono ${best ? 'text-[#3fb950] font-semibold bg-[#238636]/10' : 'text-[#c9d1d9]'}">${brl(x.rate)}</td></tr>`;
+            }).join('');
+            const link = document.getElementById('resultLink');
+            if (r.tripadvisor_url && /^https?:\/\//i.test(String(r.tripadvisor_url))) { link.href = r.tripadvisor_url; link.classList.remove('hidden'); }
+            else link.classList.add('hidden');
+            document.getElementById('resultPanel').classList.remove('hidden');
+        }
+
+        function toItem(r, worker, time) {
+            return {
+                job_id: r.job_id,
+                hotel: r.hotel_name || r.hotel_key,
+                price: Number(r.daily_rate ?? r.min_rate),
+                worker: worker,
+                latency: Number(r.processing_time_ms) || 0,
+                source: r.source,
+                time: time
+            };
+        }
+
+        async function loadHistory() {
+            try {
+                const res = await api('/history');
+                if (!res.ok) return;
+                const list = await res.json();
+                if (!Array.isArray(list)) return;
+                list.slice().reverse().forEach(r => {
+                    if (r.daily_rate == null && r.min_rate == null) return;
+                    const t = r.fetched_at ? new Date(r.fetched_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '--';
+                    historyData.push(toItem(r, r.processed_by || r.worker || '-', t));
+                    updateTable();
+                });
+                updateKPIs();
+                updateChart();
+            } catch (err) { /* histórico indisponível */ }
         }
 
         // Configuração do Gráfico Chart.js
@@ -252,31 +670,45 @@
             btn.innerHTML = `<span class="animate-pulse">Despachando ordem...</span>`;
             errBox.classList.add('hidden');
 
+            if (!selectedHotel) {
+                errBox.innerText = 'Selecione um hotel da lista de sugestões antes de disparar.';
+                errBox.classList.remove('hidden');
+                btn.disabled = false;
+                btn.innerHTML = `<span>Disparar Varredura Distribuída</span>`;
+                return;
+            }
+
             const payload = {
-                hotel_name: document.getElementById('hotelName').value,
+                hotel_key: selectedHotel.hotel_key,
                 checkin_date: document.getElementById('checkin').value,
-                checkout_date: document.getElementById('checkout').value
+                checkout_date: document.getElementById('checkout').value,
+                currency: 'BRL'
             };
 
             try {
-                const res = await fetch('/jobs/dispatch', {
+                const res = await api('/jobs/dispatch', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
 
-                const data = await res.json();
+                let data = {};
+                try { data = await res.json(); } catch (_) {}
 
-                if (!res.ok) throw new Error(data.detail || 'Falha ao conectar ao cluster');
+                if (!res.ok) {
+                    const msgs = {
+                        403: 'Sem permissão para esta ação.',
+                        409: 'Este hotel já está sendo processado. Aguarde a conclusão e tente novamente.',
+                        404: 'Nenhuma oferta encontrada para este hotel nas datas escolhidas.',
+                        503: 'Serviço de preços temporariamente indisponível. Tente novamente em instantes.'
+                    };
+                    const detail = typeof data.detail === 'string' ? data.detail : '';
+                    throw new Error(msgs[res.status] || detail || 'Falha ao conectar ao cluster');
+                }
 
-                const item = {
-                    job_id: data.result.job_id,
-                    hotel: data.result.hotel_name,
-                    price: data.result.daily_rate,
-                    worker: data.dispatched_to,
-                    latency: data.result.processing_time_ms,
-                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-                };
+                showResult(data);
+                const item = toItem(data.result, data.dispatched_to,
+                    new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
 
                 historyData.push(item);
 
@@ -285,8 +717,10 @@
                 updateTable();
 
             } catch (err) {
-                errBox.innerText = err.message;
-                errBox.classList.remove('hidden');
+                if (!(err instanceof AuthError)) {
+                    errBox.textContent = err.message;
+                    errBox.classList.remove('hidden');
+                }
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = `<span>Disparar Varredura Distribuída</span>`;
@@ -305,8 +739,8 @@
             const avgLat = latencies.reduce((a, b) => a + b, 0) / total;
 
             document.getElementById('kpiTotal').innerText = total;
-            document.getElementById('kpiAvg').innerText = `R$ ${avg.toFixed(2)}`;
-            document.getElementById('kpiMin').innerText = `R$ ${min.toFixed(2)}`;
+            document.getElementById('kpiAvg').innerText = brl(avg);
+            document.getElementById('kpiMin').innerText = brl(min);
             document.getElementById('kpiLatency').innerText = `${avgLat.toFixed(1)} ms`;
         }
 
@@ -327,16 +761,199 @@
             const row = document.createElement('tr');
             row.className = "hover:bg-[#21262d]/50 transition";
             row.innerHTML = `
-                <td class="py-3 px-4 text-[#58a6ff] font-medium">${latest.job_id}</td>
-                <td class="py-3 px-4 font-sans text-white">${latest.hotel}</td>
-                <td class="py-3 px-4 text-[#3fb950] font-semibold">R$ ${latest.price.toFixed(2)}</td>
-                <td class="py-3 px-4 text-[#8b949e]">${latest.worker}</td>
-                <td class="py-3 px-4 text-[#d29922]">${latest.latency} ms</td>
-                <td class="py-3 px-4 text-[#6e7681]">${latest.time}</td>
+                <td class="py-3 px-4 text-[#58a6ff] font-medium">${esc(latest.job_id)}</td>
+                <td class="py-3 px-4 font-sans text-white">${esc(latest.hotel)}${latest.source ? ` <span class="ml-1 text-[10px] font-mono ${latest.source === 'live' ? 'text-[#3fb950]' : 'text-[#d29922]'}">${latest.source === 'live' ? 'AO VIVO' : 'CACHE'}</span>` : ''}</td>
+                <td class="py-3 px-4 text-[#3fb950] font-semibold">${brl(latest.price)}</td>
+                <td class="py-3 px-4 text-[#8b949e]">${esc(latest.worker)}</td>
+                <td class="py-3 px-4 text-[#d29922]">${esc(latest.latency)} ms</td>
+                <td class="py-3 px-4 text-[#6e7681]">${esc(latest.time)}</td>
             `;
 
             tbody.insertBefore(row, tbody.firstChild);
         }
+
+        // ---------- Saúde do Cluster (polling a cada 5 s) ----------
+        let clusterBusy = false;
+
+        function chip(label, value, ok) {
+            const color = ok === true ? 'text-[#3fb950] border-[#238636]/40 bg-[#238636]/10'
+                        : ok === false ? 'text-[#f85149] border-[#f85149]/40 bg-[#f85149]/10'
+                        : 'text-[#c9d1d9] border-[#30363d] bg-[#21262d]';
+            return `<span class="border ${color} px-2 py-0.5 rounded">${esc(label)}: ${esc(value)}</span>`;
+        }
+        function leaderName(id) {
+            return 'worker-' + String(id).padStart(2, '0');
+        }
+        function setLeaderBadge(html) {
+            document.getElementById('leaderBadge').innerHTML = 'Líder: ' + html;
+        }
+        async function getJson(path) {
+            const res = await api(path);
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.json();
+        }
+
+        function renderGateway(h) {
+            const el = document.getElementById('clusterGateway');
+            if (!h) { el.innerHTML = chip('Gateway', 'indisponível', false); return; }
+            el.innerHTML = chip('Gateway', h.status, h.status === 'UP') +
+                chip('Redis', h.redis_lock_connection, h.redis_lock_connection === 'UP') +
+                chip('RabbitMQ', h.rabbitmq, h.rabbitmq === 'UP') +
+                chip('Workers', h.registered_workers, null);
+        }
+
+        function renderNodes(data, errMsg) {
+            const body = document.getElementById('clusterNodes');
+            const err = document.getElementById('clusterNodesErr');
+            err.classList.toggle('hidden', !errMsg);
+            err.textContent = errMsg || '';
+            if (errMsg) return;
+            const nodes = (data && data.active_nodes) || {};
+            const ids = Object.keys(nodes).sort();
+            if (!ids.length) {
+                body.innerHTML = '<tr><td colspan="3" class="py-4 text-center text-[#8b949e] font-sans">Nenhum nó registrado.</td></tr>';
+                return;
+            }
+            const nowS = Date.now() / 1000;
+            body.innerHTML = ids.map(id => {
+                const n = nodes[id] || {};
+                const age = Math.max(0, Math.round(nowS - Number(n.last_seen)));
+                const ageTxt = Number.isFinite(age) ? `há ${age} s` : '--';
+                const stale = Number.isFinite(age) && age > 10;
+                return `<tr><td class="py-2 pr-2 text-white">${esc(id)}</td>` +
+                       `<td class="py-2 pr-2 text-[#8b949e]">${esc(n.endpoint)}</td>` +
+                       `<td class="py-2 text-right ${stale ? 'text-[#d29922]' : 'text-[#3fb950]'}">${esc(ageTxt)}</td></tr>`;
+            }).join('');
+        }
+
+        function renderCoordination(c) {
+            const coord = document.getElementById('clusterCoord');
+            const views = document.getElementById('clusterViews');
+            const locks = document.getElementById('clusterLocks');
+            if (!c) {
+                coord.innerHTML = chip('Coordenação', 'indisponível', false);
+                views.innerHTML = ''; locks.innerHTML = '';
+                return;
+            }
+            coord.innerHTML = chip('Líder', c.leader_id != null ? leaderName(c.leader_id) : 'sem líder', c.leader_id != null) +
+                chip('Consenso', c.consensus ? 'sim' : 'não', !!c.consensus);
+            const v = c.worker_views || {};
+            const vk = Object.keys(v).sort();
+            views.innerHTML = vk.length
+                ? vk.map(k => chip(k, v[k] === 'unreachable' ? 'inacessível' : (v[k] == null ? '?' : leaderName(v[k])), v[k] === 'unreachable' ? false : null)).join('')
+                : '<span class="text-[#8b949e] font-sans">Nenhum worker respondeu.</span>';
+            if (c.active_locks == null) {
+                locks.innerHTML = '<span class="text-[#d29922] font-sans">Locks indisponíveis (Redis).</span>';
+            } else if (!c.active_locks.length) {
+                locks.innerHTML = '<span class="text-[#8b949e] font-sans">Nenhum lock ativo.</span>';
+            } else {
+                locks.innerHTML = c.active_locks.map(l =>
+                    `<div class="flex justify-between gap-3 bg-[#21262d] border border-[#30363d] rounded px-2 py-1"><span class="text-white">${esc(l.resource)}</span><span class="text-[#8b949e]">${esc(l.owner)} · TTL ${esc(l.ttl_seconds)} s</span></div>`).join('');
+            }
+        }
+
+        async function pollLeader() {
+            if (clusterBusy || !authValid()) return;
+            clusterBusy = true;
+            try {
+                const admin = isAdmin();
+                const [h, n, c] = await Promise.allSettled([
+                    getJson('/health'),
+                    getJson('/registry/nodes'),
+                    admin ? getJson('/coordination/status') : Promise.resolve(null)
+                ]);
+                if (!authValid()) return;   // sessão encerrada durante a requisição
+                renderGateway(h.status === 'fulfilled' ? h.value : null);
+                renderNodes(n.status === 'fulfilled' ? n.value : null, n.status === 'fulfilled' ? '' : 'Falha ao consultar os nós registrados.');
+                if (admin) {
+                    renderCoordination(c.status === 'fulfilled' ? c.value : null);
+                    if (c.status === 'fulfilled' && c.value && c.value.leader_id != null) {
+                        setLeaderBadge(`<strong class="text-[#3fb950] font-normal">${esc(leaderName(c.value.leader_id))}</strong>`);
+                    } else if (c.status === 'fulfilled') {
+                        setLeaderBadge('<strong class="text-[#d29922] font-normal">sem consenso</strong>');
+                    } else {
+                        setLeaderBadge('<strong class="text-[#f85149] font-normal">indisponível</strong>');
+                    }
+                } else {
+                    setLeaderBadge('<strong class="text-[#8b949e] font-normal">restrito</strong>');
+                }
+                document.getElementById('clusterStamp').textContent = new Date().toLocaleTimeString('pt-BR');
+            } catch (err) {
+                /* AuthError: logout já tratado; demais erros ficam nos painéis */
+            } finally {
+                clusterBusy = false;
+            }
+        }
+
+        // ---------- Varredura em lote ----------
+        function sweepError(msg) {
+            const box = document.getElementById('sweepError');
+            box.textContent = msg || '';
+            box.classList.toggle('hidden', !msg);
+        }
+
+        function renderSweep(s) {
+            const total = Number(s.total) || 0;
+            const done = (Number(s.done) || 0) + (Number(s.errors) || 0) + (Number(s.no_rates) || 0);
+            const pct = total ? Math.min(100, Math.round(done / total * 100)) : 100;
+            document.getElementById('sweepBar').style.width = pct + '%';
+            document.getElementById('sweepText').textContent =
+                `${done}/${total} (${pct}%) · ok ${s.done || 0} · erros ${s.errors || 0} · sem tarifa ${s.no_rates || 0}` +
+                (s.finished ? ' · concluída' : '');
+        }
+
+        document.getElementById('sweepBtn').addEventListener('click', async () => {
+            const btn = document.getElementById('sweepBtn');
+            btn.disabled = true;
+            sweepError('');
+            clearInterval(sweepTimer);
+            try {
+                const res = await api('/sweeps', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ top_n: 5, date_offsets: [7, 14] })
+                });
+                let data = {};
+                try { data = await res.json(); } catch (_) {}
+                if (!res.ok) {
+                    const detail = typeof data.detail === 'string' ? data.detail : '';
+                    const msgs = { 403: 'Sem permissão para esta ação.', 503: 'Serviço de varredura indisponível. Tente novamente em instantes.' };
+                    sweepError(msgs[res.status] || detail || 'Falha ao disparar a varredura.');
+                    btn.disabled = false;
+                    return;
+                }
+                const id = data.sweep_id;
+                document.getElementById('sweepBox').classList.remove('hidden');
+                renderSweep({ total: data.jobs_enqueued, done: 0, errors: 0, no_rates: 0 });
+                let failures = 0, busy = false;
+                sweepTimer = setInterval(async () => {
+                    if (busy) return;
+                    busy = true;
+                    try {
+                        const r = await api(`/sweeps/${encodeURIComponent(id)}`);
+                        if (!r.ok) throw new Error('HTTP ' + r.status);
+                        const s = await r.json();
+                        failures = 0;
+                        renderSweep(s);
+                        if (s.finished) { clearInterval(sweepTimer); btn.disabled = false; }
+                    } catch (err) {
+                        if (err instanceof AuthError) return;
+                        if (++failures >= 5) {
+                            clearInterval(sweepTimer); btn.disabled = false;
+                            sweepError('Não foi possível acompanhar o progresso da varredura.');
+                        }
+                    } finally { busy = false; }
+                }, 1500);
+            } catch (err) {
+                if (!(err instanceof AuthError)) sweepError('Falha ao conectar ao servidor.');
+                btn.disabled = false;
+            }
+        });
+
+        // ---------- Inicialização ----------
+        auth = loadAuth();
+        if (authValid()) startSession();
+        else { auth = null; clearAuth(); showLogin(''); }
     </script>
 </body>
 </html>
