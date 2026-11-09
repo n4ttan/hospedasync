@@ -15,6 +15,17 @@ engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
+# Replica de leitura (hot standby) opcional. Sem DATABASE_REPLICA_URL, leituras vao ao primario.
+DATABASE_REPLICA_URL = os.getenv("DATABASE_REPLICA_URL", "")
+replica_engine = (
+    create_engine(DATABASE_REPLICA_URL, pool_pre_ping=True, connect_args=(
+        {"connect_timeout": 2} if DATABASE_REPLICA_URL.startswith("postgresql") else {}))
+    if DATABASE_REPLICA_URL else None
+)
+ReplicaSessionLocal = (
+    sessionmaker(autocommit=False, autoflush=False, bind=replica_engine) if replica_engine else None
+)
+
 class JobHistory(Base):
     __tablename__ = "job_history"
 
@@ -80,6 +91,76 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def get_read_db(consistency: str = "strong", primary_db=None):
+    """Sessao para leitura. Retorna (session, served_by, fallback).
+
+    strong  -> primario (le o que foi confirmado, sem defasagem).
+    eventual -> replica (pode estar atrasada); se ausente/indisponivel cai para o primario
+                (served_by="primary", fallback=True).
+    primary_db: sessao do primario ja aberta (ex.: Depends(get_db)); se omitida abre uma nova.
+    Quem chama fecha a sessao retornada apenas se ela nao for primary_db.
+    """
+    def primary():
+        return primary_db if primary_db is not None else SessionLocal()
+
+    if consistency == "eventual":
+        if ReplicaSessionLocal is None:
+            return primary(), "primary", True
+        rdb = None
+        try:
+            rdb = ReplicaSessionLocal()
+            rdb.execute(text("SELECT 1"))
+            return rdb, "replica", False
+        except Exception:
+            if rdb is not None:
+                rdb.close()
+            return primary(), "primary", True
+    return primary(), "primary", False
+
+
+def replica_lag_ms(rdb):
+    """Atraso de replay medido na replica (ms), ou None se nao for standby."""
+    row = rdb.execute(text(
+        "SELECT CASE WHEN pg_is_in_recovery() THEN "
+        "COALESCE(EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp())) * 1000, 0) END"
+    )).scalar()
+    return None if row is None else round(float(row), 1)
+
+
+def consistency_status():
+    """Estado da replicacao visto do primario e da replica (nunca levanta excecao)."""
+    st = {"replica_configured": replica_engine is not None, "replica_reachable": False,
+          "replication_lag_ms": None, "replay_lag_bytes": None, "sync_mode": None,
+          "primary_in_recovery": False}
+    try:
+        with engine.connect() as c:
+            st["primary_in_recovery"] = bool(c.execute(text("SELECT pg_is_in_recovery()")).scalar())
+            row = c.execute(text(
+                "SELECT sync_state, pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn), "
+                "EXTRACT(EPOCH FROM replay_lag) * 1000 FROM pg_stat_replication LIMIT 1")).first()
+            if row:
+                st["sync_mode"] = row[0]
+                st["replay_lag_bytes"] = int(row[1]) if row[1] is not None else None
+                st["_primary_lag_ms"] = round(float(row[2]), 1) if row[2] is not None else None
+    except Exception:
+        pass
+    if replica_engine is not None:
+        try:
+            with replica_engine.connect() as c:
+                st["replica_reachable"] = True
+                lag = c.execute(text(
+                    "SELECT CASE WHEN pg_is_in_recovery() THEN COALESCE(EXTRACT(EPOCH FROM "
+                    "(now() - pg_last_xact_replay_timestamp())) * 1000, 0) END")).scalar()
+                if lag is not None:
+                    st["replication_lag_ms"] = round(float(lag), 1)
+        except Exception:
+            pass
+    if st["replication_lag_ms"] is None:
+        st["replication_lag_ms"] = st.get("_primary_lag_ms")
+    st.pop("_primary_lag_ms", None)
+    return st
 
 
 def init_db():

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Response, Query
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -14,7 +14,8 @@ import datetime
 from typing import Optional
 from pathlib import Path
 
-from database import init_db, SessionLocal, JobHistory, Hotel, get_db
+from database import (init_db, SessionLocal, JobHistory, Hotel, get_db, get_read_db,
+                      replica_lag_ms, consistency_status)
 from lamport import merge_events
 import sweeps
 from sweeps import EVENTS, router as sweeps_router
@@ -232,10 +233,41 @@ def refresh_hotels(db: Session = Depends(get_db)):
     return result
 
 @app.get("/history")
-def get_history(db: Session = Depends(get_db)):
-    """Retorna o histórico persistido no banco de dados"""
-    records = db.query(JobHistory).order_by(JobHistory.created_at.desc()).limit(50).all()
-    return [_job_to_dict(r) for r in records]
+def get_history(response: Response, consistency: str = Query("strong", pattern="^(strong|eventual)$"),
+                pdb: Session = Depends(get_db)):
+    """Historico persistido. strong (padrao) le do primario; eventual le da replica
+    (pode estar defasada) e cai para o primario se ela estiver fora. Modo e origem vao em headers."""
+    db, served_by, fallback = get_read_db(consistency, pdb)
+    try:
+        try:
+            records = db.query(JobHistory).order_by(JobHistory.created_at.desc()).limit(50).all()
+        except Exception:
+            if served_by != "replica":
+                raise
+            db.close()
+            db, served_by, fallback = pdb, "primary", True
+            records = db.query(JobHistory).order_by(JobHistory.created_at.desc()).limit(50).all()
+        response.headers["X-Consistency"] = consistency
+        response.headers["X-Served-By"] = served_by
+        if fallback:
+            response.headers["X-Replica-Fallback"] = "true"
+        if served_by == "replica":
+            try:
+                lag = replica_lag_ms(db)
+                if lag is not None:
+                    response.headers["X-Replication-Lag-Ms"] = str(lag)
+            except Exception:
+                pass
+        return [_job_to_dict(r) for r in records]
+    finally:
+        if db is not pdb:
+            db.close()
+
+
+@app.get("/consistency/status")
+def get_consistency_status():
+    """Estado da replicacao: lag (ms e bytes), modo sincrono e alcancabilidade da replica."""
+    return consistency_status()
 
 def _resolve_hotel(db, req: TriggerJobRequest):
     """Retorna (hotel_key, hotel_name). 404 se so o nome veio e nao ha no catalogo."""
