@@ -129,3 +129,26 @@ def test_validation(env, patch):
     body = {k: v for k, v in body.items() if v is not None}
     assert client.post("/scrape", json=body).status_code == 422
     assert not calls
+
+
+def test_breaker_opens_and_fails_fast(env):
+    client, scraper, install, calls = env
+    from resilience import CircuitBreaker
+    clock = [0.0]
+    old = scraper.breaker
+    scraper.breaker = CircuitBreaker("xotelo", 2, 30, clock=lambda: clock[0])
+    try:
+        install(lambda r: httpx.Response(503))
+        for _ in range(2):
+            assert client.post("/scrape", json=BODY).status_code == 502
+        n = len(calls)
+        r = client.post("/scrape", json=BODY)
+        assert r.status_code == 502 and r.json()["detail"]["error"] == "upstream_unavailable"
+        assert len(calls) == n  # sem chamar o upstream
+        assert scraper.breaker_state()["state"] == "open"
+        clock[0] = 30
+        install(lambda r: httpx.Response(200, json=OK))
+        assert client.post("/scrape", json=BODY).status_code == 200
+        assert scraper.breaker_state()["state"] == "closed"
+    finally:
+        scraper.breaker = old

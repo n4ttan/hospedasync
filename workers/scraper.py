@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 
 import httpx
 
+from resilience import CircuitBreaker
+
 BASE_URL = os.getenv("XOTELO_BASE_URL", "https://data.xotelo.com/api").rstrip("/")
 TIMEOUT = float(os.getenv("XOTELO_TIMEOUT", "15"))
 MAX_ATTEMPTS = int(os.getenv("XOTELO_MAX_ATTEMPTS", "3"))
@@ -14,8 +16,11 @@ BACKOFF_BASE = float(os.getenv("XOTELO_BACKOFF_BASE", "0.5"))  # 0.5 s, 1 s
 CACHE_TTL = float(os.getenv("XOTELO_CACHE_TTL", "300"))
 MAX_CONCURRENCY = int(os.getenv("XOTELO_MAX_CONCURRENCY", "3"))
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis-lock:6379/0")
+BREAKER_THRESHOLD = int(os.getenv("XOTELO_BREAKER_THRESHOLD", "5"))
+BREAKER_RECOVERY = float(os.getenv("XOTELO_BREAKER_RECOVERY", "30"))
 USER_AGENT = "HospedaSync/1.0 (trabalho academico de Sistemas Distribuidos)"
 
+breaker = CircuitBreaker("xotelo", BREAKER_THRESHOLD, BREAKER_RECOVERY)
 _transport = None  # injetavel em testes (httpx.MockTransport)
 _cache: dict = {}  # chave -> (expira_em, payload)
 _sem = None
@@ -28,8 +33,16 @@ class UpstreamError(Exception):
     """Xotelo indisponivel apos retries (timeout, 5xx, error != null)."""
 
 
+class UpstreamCircuitOpen(UpstreamError):
+    """Breaker da Xotelo aberto: falha imediata, sem chamar o upstream."""
+
+
 class NoRates(Exception):
     """Hotel sem nenhuma oferta."""
+
+
+def breaker_state():
+    return breaker.snapshot()
 
 
 def _semaphore():
@@ -80,7 +93,7 @@ def _redis_set(key, data):
         _redis_down_until = time.monotonic() + REDIS_RETRY_AFTER
 
 
-async def _call(hotel_key, chk_in, chk_out, currency):
+async def _request(hotel_key, chk_in, chk_out, currency):
     params = {"hotel_key": hotel_key, "chk_in": chk_in, "chk_out": chk_out, "currency": currency}
     last = "erro desconhecido"
     for attempt in range(MAX_ATTEMPTS):
@@ -106,7 +119,26 @@ async def _call(hotel_key, chk_in, chk_out, currency):
             # erro nao transitorio: sem retry
             raise UpstreamError(f"Xotelo retornou erro: {body.get('error') or resp.status_code}")
         return body.get("result") or {}
-    raise UpstreamError(f"Xotelo indisponivel apos {MAX_ATTEMPTS} tentativas ({last})")
+    raise _Transient(f"Xotelo indisponivel apos {MAX_ATTEMPTS} tentativas ({last})")
+
+
+class _Transient(UpstreamError):
+    """Falha transitoria (conta para o breaker)."""
+
+
+async def _call(hotel_key, chk_in, chk_out, currency):
+    if not breaker.allow():
+        raise UpstreamCircuitOpen("circuit_open")
+    try:
+        result = await _request(hotel_key, chk_in, chk_out, currency)
+    except _Transient:
+        breaker.record_failure()
+        raise
+    except BaseException:
+        breaker.record_success()  # upstream respondeu (erro nao transitorio): libera a sonda
+        raise
+    breaker.record_success()
+    return result
 
 
 async def fetch_rates(hotel_key, chk_in, chk_out, currency="BRL"):

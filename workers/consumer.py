@@ -13,6 +13,10 @@ LOCK_RETRY_DELAY = 1.0
 MAX_LOCK_CONFLICTS = 30
 CONFLICT_HEADER = "x-lock-conflicts"
 STARTUP_RETRY_DELAY = 5.0
+INFRA_HEADER = "x-infra-retries"
+MAX_INFRA_RETRIES = 10
+INFRA_BACKOFF_BASE = 2.0
+INFRA_BACKOFF_MAX = 30.0
 
 
 def _result_msg(job, status, result=None, error=None):
@@ -57,7 +61,21 @@ async def handle_message(message, channel):
                             job_id=job.get("job_id"), hotel_key=job.get("hotel_key"))
         resource = job["hotel_key"]
         owner = f"{election.WORKER_ID}:{job['job_id']}"
-        acquired = await asyncio.to_thread(distlock.acquire_lock, resource, owner, LOCK_TTL)
+        try:
+            acquired = await asyncio.to_thread(distlock.acquire_lock, resource, owner, LOCK_TTL)
+        except Exception as exc:
+            # Redis de lock fora do ar: falha de infra transitoria, nao vai para a DLQ
+            infra = int((message.headers or {}).get(INFRA_HEADER, 0) or 0)
+            if infra >= MAX_INFRA_RETRIES:
+                election.EVENTS.log("job_lock_unavailable", job_id=job["job_id"], hotel_key=resource)
+                await publish_json(channel, RESULTS_QUEUE, _result_msg(job, "error", error="lock_service_unavailable"))
+            else:
+                election.EVENTS.log("job_lock_infra_retry", job_id=job["job_id"], hotel_key=resource,
+                                    retries=infra + 1, error=type(exc).__name__)
+                await asyncio.sleep(min(INFRA_BACKOFF_MAX, INFRA_BACKOFF_BASE * 2 ** infra))
+                await publish_json(channel, JOBS_QUEUE, job, headers={INFRA_HEADER: infra + 1})
+            await message.ack()
+            return
 
         if not acquired:
             conflicts = int((message.headers or {}).get(CONFLICT_HEADER, 0) or 0)
@@ -80,6 +98,8 @@ async def handle_message(message, channel):
             out = _result_msg(job, "ok", result=build_scrape_payload(job, data, started))
         except scraper.NoRates:
             out = _result_msg(job, "no_rates", error="no_rates")
+        except scraper.UpstreamCircuitOpen:
+            out = _result_msg(job, "error", error="upstream_circuit_open")
         except scraper.UpstreamError as exc:
             out = _result_msg(job, "error", error=str(exc))
         election.EVENTS.log("job_done", job_id=job["job_id"], status=out["status"])

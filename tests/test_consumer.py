@@ -136,3 +136,40 @@ def test_invalid_body_nacks(cons, env):
     m = Msg(None, body=b"not json")
     run(cons, m)
     assert m.nacked == [False]
+
+
+def test_lock_redis_down_republishes_with_infra_header(cons, env, monkeypatch):
+    sleeps = []
+
+    async def rec(d):
+        sleeps.append(d)
+
+    def boom(res, owner, ttl):
+        raise ConnectionError("redis down")
+    monkeypatch.setattr(cons.distlock, "acquire_lock", boom)
+    monkeypatch.setattr(cons.asyncio, "sleep", rec)
+    msg = Msg(JOB, headers={"x-infra-retries": 2})
+    run(cons, msg)
+    assert env["published"][0][0] == cons.JOBS_QUEUE
+    assert env["published"][0][2] == {"x-infra-retries": 3}
+    assert sleeps == [8.0] and msg.acked == 1 and not msg.nacked
+
+
+def test_lock_redis_down_gives_up_after_10(cons, env, monkeypatch):
+    def boom(res, owner, ttl):
+        raise ConnectionError("redis down")
+    monkeypatch.setattr(cons.distlock, "acquire_lock", boom)
+    msg = Msg(JOB, headers={"x-infra-retries": 10})
+    run(cons, msg)
+    rk, payload, _ = env["published"][0]
+    assert rk == cons.RESULTS_QUEUE and payload["error"] == "lock_service_unavailable"
+    assert msg.acked == 1 and not msg.nacked
+
+
+def test_breaker_open_publishes_circuit_open(cons, env):
+    env["fetch"] = cons.scraper.UpstreamCircuitOpen("circuit_open")
+    msg = Msg(JOB)
+    run(cons, msg)
+    rk, payload, _ = env["published"][0]
+    assert rk == cons.RESULTS_QUEUE and payload["status"] == "error" and payload["error"] == "upstream_circuit_open"
+    assert msg.acked == 1 and env["released"]
