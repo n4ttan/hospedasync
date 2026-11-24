@@ -3,957 +3,794 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HospedaSync | Enterprise Rate Intelligence</title>
-    <!-- Tailwind CSS CDN -->
+    <title>HospedaSync | Inteligência Distribuída em Hotelaria</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Chart.js CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        charcoal: {
+                            950: '#0d0e11',
+                            900: '#14161a',
+                            800: '#1e2026',
+                            700: '#2a2d35',
+                            600: '#3a3e49'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
-        body { font-family: 'Inter', sans-serif; }
-        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        body { background-color: #0d0e11; color: #e5e7eb; font-family: 'Inter', system-ui, sans-serif; }
+        .tab-active { border-bottom: 2px solid #9ca3af; color: #ffffff; background-color: rgba(255, 255, 255, 0.04); }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #14161a; }
+        ::-webkit-scrollbar-thumb { background: #3a3e49; border-radius: 4px; }
     </style>
 </head>
-<body class="bg-[#161b22] text-[#c9d1d9] min-h-screen flex flex-col antialiased selection:bg-[#1f6feb]/30 selection:text-[#58a6ff]">
+<body class="min-h-screen flex flex-col">
 
-    <!-- Top Navigation -->
-    <header class="border-b border-[#30363d] bg-[#0d1117]/90 backdrop-blur sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-            <div>
-                <h1 class="text-base font-bold text-white tracking-tight">HospedaSync</h1>
-                <p class="text-xs text-[#8b949e]">Inteligência Tarifária Distribuída em Nuvem</p>
-            </div>
-
-            <div class="flex items-center space-x-6">
-                <div class="hidden md:flex items-center space-x-5 text-xs text-[#8b949e] border-r border-[#30363d] pr-6">
-                    <div>
-                        <span class="text-[#6e7681] block">Região</span>
-                        <span class="text-[#c9d1d9] font-medium">Rio de Janeiro, BR</span>
+    <!-- NAVBAR SUPERIOR -->
+    <nav class="bg-charcoal-900 border-b border-charcoal-700 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Logo -->
+                <div class="flex items-center gap-3 cursor-pointer" onclick="switchTab('search')">
+                    <div class="w-9 h-9 rounded-lg bg-charcoal-700 border border-charcoal-600 flex items-center justify-center text-gray-200">
+                        <i class="fa-solid fa-network-wired"></i>
                     </div>
                     <div>
-                        <span class="text-[#6e7681] block">Orquestração</span>
-                        <span class="text-[#c9d1d9] font-medium">Docker Cluster</span>
+                        <span class="font-bold text-lg tracking-tight text-white">Hospeda<span class="text-gray-400">Sync</span></span>
+                        <span class="hidden sm:inline-block ml-2 text-[10px] uppercase tracking-widest px-2 py-0.5 rounded bg-charcoal-800 text-gray-400 border border-charcoal-700">Distributed v2.0</span>
                     </div>
                 </div>
 
-                <div class="flex items-center gap-2 bg-[#21262d] border border-[#30363d] px-3.5 py-1.5 rounded-lg shadow-sm">
-                    <span class="h-2 w-2 rounded-full bg-[#3fb950] animate-pulse"></span>
-                    <span class="text-xs text-[#c9d1d9] font-mono" id="leaderBadge">Líder: <strong class="text-[#3fb950] font-normal">verificando...</strong></span>
+                <!-- Links de Navegação -->
+                <div class="hidden md:flex items-center space-x-1 h-full">
+                    <button onclick="switchTab('search')" id="nav-search" class="tab-btn tab-active px-4 h-full text-sm font-medium text-gray-300 hover:text-white transition flex items-center gap-2">
+                        <i class="fa-solid fa-magnifying-glass-dollar text-xs"></i> Comparar Hotéis
+                    </button>
+                    <button onclick="switchTab('bookings')" id="nav-bookings" class="tab-btn px-4 h-full text-sm font-medium text-gray-400 hover:text-white transition flex items-center gap-2">
+                        <i class="fa-solid fa-calendar-check text-xs"></i> Minhas Reservas
+                        <span id="badge-bookings" class="ml-1 px-1.5 py-0.2 text-xs rounded-full bg-charcoal-700 text-gray-200">0</span>
+                    </button>
+                    <button onclick="switchTab('local')" id="nav-local" class="tab-btn px-4 h-full text-sm font-medium text-gray-400 hover:text-white transition flex items-center gap-2">
+                        <i class="fa-solid fa-map-location-dot text-xs"></i> Como Chegar & Arredores
+                    </button>
+                    <button onclick="switchTab('cluster')" id="nav-cluster" class="tab-btn px-4 h-full text-sm font-medium text-gray-400 hover:text-white transition flex items-center gap-2">
+                        <i class="fa-solid fa-server text-xs"></i> Nós & Nomeação
+                    </button>
                 </div>
 
-                <div id="userBox" class="hidden items-center gap-3 pl-6 border-l border-[#30363d]">
-                    <div class="text-xs leading-tight text-right">
-                        <span id="userName" class="block text-[#c9d1d9] font-medium"></span>
-                        <span id="userRole" class="block text-[10px] font-mono text-[#8b949e] uppercase"></span>
+                <!-- Status Service Registry -->
+                <div class="flex items-center gap-3">
+                    <div onclick="switchTab('cluster')" class="cursor-pointer flex items-center gap-2 px-3 py-1.5 rounded-full bg-charcoal-800 border border-charcoal-700 hover:border-charcoal-600 transition" title="Status do Service Discovery">
+                        <span id="registry-dot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span id="registry-count" class="text-xs font-medium text-gray-300">1 Nó Ativo</span>
                     </div>
-                    <button id="logoutBtn" type="button" class="text-xs bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-[#c9d1d9] px-3 py-1.5 rounded-lg transition">Sair</button>
                 </div>
             </div>
         </div>
-    </header>
 
-    <!-- Aviso (toast) -->
-    <div id="toast" class="hidden fixed top-20 right-6 z-[90] max-w-sm bg-[#9e6a03]/20 border border-[#9e6a03]/40 text-[#d29922] px-4 py-2.5 rounded-lg text-xs shadow-lg" role="alert"></div>
-
-    <!-- Tela de login -->
-    <div id="loginOverlay" class="hidden fixed inset-0 z-[100] bg-[#0d1117] items-center justify-center px-6">
-        <form id="loginForm" class="w-full max-w-sm bg-[#161b22] border border-[#30363d] rounded-xl shadow-lg p-6 space-y-4" autocomplete="on">
-            <div class="border-b border-[#30363d] pb-3">
-                <h2 class="text-base font-bold text-white tracking-tight">HospedaSync</h2>
-                <p class="text-xs text-[#8b949e] mt-0.5">Entre para acessar o painel do cluster.</p>
-            </div>
-            <div>
-                <label for="loginUser" class="block text-xs font-medium text-[#c9d1d9] mb-1.5">Usuário</label>
-                <input type="text" id="loginUser" required autocomplete="username"
-                       class="w-full bg-[#21262d] border border-[#30363d] rounded-lg px-3.5 py-2 text-white text-sm focus:outline-none focus:border-[#1f6feb] transition">
-            </div>
-            <div>
-                <label for="loginPass" class="block text-xs font-medium text-[#c9d1d9] mb-1.5">Senha</label>
-                <input type="password" id="loginPass" required autocomplete="current-password"
-                       class="w-full bg-[#21262d] border border-[#30363d] rounded-lg px-3.5 py-2 text-white text-sm focus:outline-none focus:border-[#1f6feb] transition">
-            </div>
-            <div id="loginError" class="hidden bg-[#f85149]/10 border border-[#f85149]/30 text-[#f85149] p-3 rounded-lg text-xs" role="alert"></div>
-            <button type="submit" id="loginBtn" class="w-full bg-[#238636] hover:bg-[#2ea043] disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg shadow transition text-xs">Entrar</button>
-        </form>
-    </div>
-
-    <!-- Main Workspace -->
-    <main class="max-w-7xl mx-auto px-6 py-8 w-full flex-1 space-y-8">
-        
-        <!-- Header Actions -->
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-                <h1 class="text-xl font-bold text-white tracking-tight">Monitoramento do Compset Concorrencial</h1>
-                <p class="text-xs text-[#8b949e] mt-0.5">Dispare ordens de scraping em tempo real para os nós de coleta.</p>
-            </div>
-            
-            <div class="flex items-center gap-2">
-                <span class="text-xs text-[#6e7681] font-medium">Atalhos:</span>
-                <button onclick="setHotel('Copacabana')" class="text-xs bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-[#c9d1d9] px-3 py-1.5 rounded-lg transition">Copacabana</button>
-                <button onclick="setHotel('Ipanema')" class="text-xs bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-[#c9d1d9] px-3 py-1.5 rounded-lg transition">Ipanema</button>
-                <button onclick="setHotel('Hilton')" class="text-xs bg-[#21262d] hover:bg-[#30363d] border border-[#30363d] text-[#c9d1d9] px-3 py-1.5 rounded-lg transition">Hilton</button>
-            </div>
+        <!-- Menu Mobile -->
+        <div class="md:hidden flex border-t border-charcoal-800 bg-charcoal-900 overflow-x-auto">
+            <button onclick="switchTab('search')" class="flex-1 py-2.5 text-xs text-center text-gray-300 border-r border-charcoal-800">Comparar</button>
+            <button onclick="switchTab('bookings')" class="flex-1 py-2.5 text-xs text-center text-gray-300 border-r border-charcoal-800">Reservas</button>
+            <button onclick="switchTab('local')" class="flex-1 py-2.5 text-xs text-center text-gray-300 border-r border-charcoal-800">Rotas/Local</button>
+            <button onclick="switchTab('cluster')" class="flex-1 py-2.5 text-xs text-center text-gray-300">Cluster</button>
         </div>
+    </nav>
 
-        <!-- Executive KPI Cards -->
-        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div class="bg-[#0d1117] border border-[#30363d] p-5 rounded-xl shadow-sm hover:border-[#8b949e]/50 transition">
-                <div class="flex justify-between items-start">
-                    <span class="text-xs font-medium text-[#8b949e]">Total de Coletas</span>
-                    <span class="text-[10px] bg-[#21262d] text-[#8b949e] font-mono px-2 py-0.5 rounded border border-[#30363d]">JOBS</span>
-                </div>
-                <div class="text-2xl font-bold text-white mt-2" id="kpiTotal">0</div>
-                <p class="text-[11px] text-[#6e7681] mt-1">Consultas processadas com sucesso</p>
-            </div>
+    <!-- CONTEÚDO PRINCIPAL -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
-            <div class="bg-[#0d1117] border border-[#30363d] p-5 rounded-xl shadow-sm hover:border-[#8b949e]/50 transition">
-                <div class="flex justify-between items-start">
-                    <span class="text-xs font-medium text-[#8b949e]">Média Compset (Diária)</span>
-                    <span class="text-[10px] bg-[#1f6feb]/10 text-[#58a6ff] border border-[#1f6feb]/20 font-mono px-2 py-0.5 rounded">BRL</span>
-                </div>
-                <div class="text-2xl font-bold text-[#58a6ff] mt-2" id="kpiAvg">R$ 0,00</div>
-                <p class="text-[11px] text-[#6e7681] mt-1">Média das diárias capturadas</p>
-            </div>
-
-            <div class="bg-[#0d1117] border border-[#30363d] p-5 rounded-xl shadow-sm hover:border-[#8b949e]/50 transition">
-                <div class="flex justify-between items-start">
-                    <span class="text-xs font-medium text-[#8b949e]">Menor Tarifa Mapeada</span>
-                    <span class="text-[10px] bg-[#238636]/15 text-[#3fb950] border border-[#238636]/30 font-mono px-2 py-0.5 rounded">BEST RATE</span>
-                </div>
-                <div class="text-2xl font-bold text-[#3fb950] mt-2" id="kpiMin">R$ 0,00</div>
-                <p class="text-[11px] text-[#6e7681] mt-1">Oportunidade mínima de mercado</p>
-            </div>
-
-            <div class="bg-[#0d1117] border border-[#30363d] p-5 rounded-xl shadow-sm hover:border-[#8b949e]/50 transition">
-                <div class="flex justify-between items-start">
-                    <span class="text-xs font-medium text-[#8b949e]">Latência dos Workers</span>
-                    <span class="text-[10px] bg-[#9e6a03]/15 text-[#d29922] border border-[#9e6a03]/30 font-mono px-2 py-0.5 rounded">REST I/O</span>
-                </div>
-                <div class="text-2xl font-bold text-[#d29922] mt-2" id="kpiLatency">0 ms</div>
-                <p class="text-[11px] text-[#6e7681] mt-1">Tempo médio de resposta inter-serviços</p>
-            </div>
-        </section>
-
-        <!-- Main Grid: Controls + Chart -->
-        <section class="grid lg:grid-cols-3 gap-8 items-start">
-            
-            <!-- Control Panel Form -->
-            <div class="bg-[#0d1117] border border-[#30363d] p-6 rounded-xl shadow-sm space-y-5">
-                <div class="border-b border-[#30363d] pb-3">
-                    <h2 class="text-sm font-bold text-white">Parâmetros da Consulta</h2>
-                    <p class="text-xs text-[#8b949e] mt-0.5">Configure os dados do hotel e o período.</p>
-                </div>
-                
-                <form id="dispatchForm" class="space-y-4">
-                    <div class="relative">
-                        <label class="block text-xs font-medium text-[#c9d1d9] mb-1.5">Hotel Concorrente</label>
-                        <input type="text" id="hotelName" required autocomplete="off" placeholder="Digite para buscar um hotel..."
-                               class="w-full bg-[#21262d] border border-[#30363d] rounded-lg px-3.5 py-2 text-white text-sm focus:outline-none focus:border-[#1f6feb] transition">
-                        <p id="hotelSelected" class="hidden text-[11px] text-[#3fb950] mt-1"></p>
-                        <ul id="hotelSuggestions" class="hidden absolute z-40 left-0 right-0 mt-1 max-h-64 overflow-y-auto bg-[#161b22] border border-[#30363d] rounded-lg shadow-lg divide-y divide-[#30363d]/60"></ul>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-xs font-medium text-[#c9d1d9] mb-1.5">Check-in</label>
-                            <input type="date" id="checkin" required value="2026-09-25"
-                                   class="w-full bg-[#21262d] border border-[#30363d] rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-[#1f6feb] transition">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-[#c9d1d9] mb-1.5">Check-out</label>
-                            <input type="date" id="checkout" required value="2026-09-27"
-                                   class="w-full bg-[#21262d] border border-[#30363d] rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-[#1f6feb] transition">
-                        </div>
-                    </div>
-
+        <!-- ========================================== -->
+        <!-- ABA 1: BUSCAR & COMPARAR HOTÉIS            -->
+        <!-- ========================================== -->
+        <section id="view-search" class="space-y-6">
+            <!-- Header & Painel de Busca por Região -->
+            <div class="bg-charcoal-900 border border-charcoal-700 rounded-xl p-6 shadow-lg">
+                <div class="flex flex-col md:flex-row md:items-center justify-between mb-5 gap-2">
                     <div>
-                        <label class="block text-xs font-medium text-[#c9d1d9] mb-1.5">Canal de Origem</label>
-                        <select id="otaSource" class="w-full bg-[#21262d] border border-[#30363d] rounded-lg px-3.5 py-2 text-[#c9d1d9] text-xs focus:outline-none focus:border-[#1f6feb]">
-                            <option value="Booking.com">Booking.com (OTA)</option>
-                            <option value="Expedia">Expedia Group</option>
-                            <option value="Direto">Website Direto do Hotel</option>
+                        <h1 class="text-xl font-bold text-white">Busca Distribuída de Tarifas</h1>
+                        <p class="text-sm text-gray-400">Selecione uma região para os workers coletarem e compararem preços em tempo real.</p>
+                    </div>
+                    <span class="text-xs text-gray-400 bg-charcoal-800 px-3 py-1 rounded border border-charcoal-700">
+                        <i class="fa-solid fa-bolt mr-1 text-gray-300"></i> Balanceamento via Service Registry
+                    </span>
+                </div>
+
+                <form onsubmit="handleSearch(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-400 mb-1.5">Região / Destino</label>
+                        <select id="search-region" class="w-full bg-charcoal-800 border border-charcoal-600 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-gray-400">
+                            <option value="all">Todas as Regiões</option>
+                            <option value="Poços de Caldas - MG" selected>Poços de Caldas - MG</option>
+                            <option value="São Paulo - SP">São Paulo - SP</option>
+                            <option value="Foz do Iguaçu - PR">Foz do Iguaçu - PR</option>
+                            <option value="Gramado - RS">Gramado - RS</option>
                         </select>
                     </div>
-                    
-                    <button type="submit" id="submitBtn" 
-                            class="w-full bg-[#238636] hover:bg-[#2ea043] text-white font-medium py-2.5 rounded-lg shadow transition text-xs flex justify-center items-center gap-2">
-                        <span>Disparar Varredura Distribuída</span>
-                    </button>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-400 mb-1.5">Check-in</label>
+                        <input type="date" id="search-checkin" value="2026-12-10" class="w-full bg-charcoal-800 border border-charcoal-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-gray-400">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-400 mb-1.5">Check-out</label>
+                        <input type="date" id="search-checkout" value="2026-12-13" class="w-full bg-charcoal-800 border border-charcoal-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-gray-400">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-400 mb-1.5">Ordenar por</label>
+                        <select id="search-sort" onchange="renderHotels()" class="w-full bg-charcoal-800 border border-charcoal-600 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-gray-400">
+                            <option value="price_asc">Menor Diária</option>
+                            <option value="price_desc">Maior Diária</option>
+                            <option value="rating">Melhor Avaliação</option>
+                        </select>
+                    </div>
+                    <div class="flex items-end">
+                        <button type="submit" id="btn-scrape" class="w-full bg-gray-200 hover:bg-white text-charcoal-950 font-semibold py-2.5 px-4 rounded-lg text-sm transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-rotate"></i> Sincronizar Preços
+                        </button>
+                    </div>
                 </form>
-
-                <div id="errorBox" class="hidden bg-[#f85149]/10 border border-[#f85149]/30 text-[#f85149] p-3 rounded-lg text-xs"></div>
-
-                <div id="resultPanel" class="hidden border-t border-[#30363d] pt-4 space-y-3">
-                    <div class="flex flex-wrap items-center gap-2">
-                        <span id="resultBadge"></span>
-                        <span id="resultHotel" class="text-xs font-semibold text-white"></span>
-                    </div>
-                    <div id="persistWarn" class="hidden bg-[#9e6a03]/15 border border-[#9e6a03]/30 text-[#d29922] p-2.5 rounded-lg text-[11px]">
-                        Resultado não foi persistido no histórico (banco indisponível).
-                    </div>
-                    <table class="w-full text-left text-xs">
-                        <thead class="text-[10px] text-[#8b949e] uppercase border-b border-[#30363d]">
-                            <tr><th class="py-2 pr-2 font-semibold">OTA</th><th class="py-2 text-right font-semibold">Preço (diária)</th></tr>
-                        </thead>
-                        <tbody id="ratesBody" class="divide-y divide-[#30363d]/60"></tbody>
-                    </table>
-                    <a id="resultLink" href="#" target="_blank" rel="noopener noreferrer" class="hidden inline-block text-xs text-[#58a6ff] hover:underline">Ver no TripAdvisor &rarr;</a>
-                </div>
             </div>
 
-            <!-- Analytics Chart -->
-            <div class="lg:col-span-2 bg-[#0d1117] border border-[#30363d] p-6 rounded-xl shadow-sm flex flex-col justify-between h-[385px]">
-                <div class="flex justify-between items-center border-b border-[#30363d] pb-3">
-                    <div>
-                        <h2 class="text-sm font-bold text-white">Tendência Tarifária</h2>
-                        <p class="text-xs text-[#8b949e]">Histórico de flutuação dos valores retornados pelos workers.</p>
-                    </div>
-                    <span class="text-[10px] bg-[#21262d] text-[#8b949e] border border-[#30363d] px-2.5 py-1 rounded font-mono">Live Feed</span>
+            <!-- Barra de Feedback do Scraping -->
+            <div id="scrape-status" class="hidden bg-charcoal-800 border border-charcoal-600 rounded-lg px-4 py-3 text-sm text-gray-300 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <i class="fa-solid fa-circle-notch fa-spin text-gray-200"></i>
+                    <span id="scrape-status-text">Despachando tarefas aos workers ativos...</span>
                 </div>
-                
-                <div class="relative w-full h-[270px] pt-2">
-                    <canvas id="rateChart"></canvas>
-                </div>
+                <span class="text-xs font-mono text-gray-400" id="scrape-worker-tag">worker-01</span>
+            </div>
+
+            <!-- Grid de Resultados / Comparação -->
+            <div class="flex items-center justify-between">
+                <h2 class="text-base font-semibold text-gray-200">Hotéis Disponíveis na Região (<span id="hotels-count">0</span>)</h2>
+                <span class="text-xs text-gray-500">Valores atualizados pelo cluster</span>
+            </div>
+
+            <div id="hotels-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Cards inseridos via JS -->
             </div>
         </section>
 
-        <!-- Saúde do Cluster + Varredura -->
-        <section class="grid lg:grid-cols-3 gap-8 items-start">
-            <div class="lg:col-span-2 bg-[#0d1117] border border-[#30363d] p-6 rounded-xl shadow-sm space-y-4">
-                <div class="flex justify-between items-center border-b border-[#30363d] pb-3">
-                    <div>
-                        <h2 class="text-sm font-bold text-white">Saúde do Cluster</h2>
-                        <p class="text-xs text-[#8b949e]">Atualizado a cada 5 s.</p>
-                    </div>
-                    <span id="clusterStamp" class="text-[10px] bg-[#21262d] text-[#8b949e] border border-[#30363d] px-2.5 py-1 rounded font-mono">--</span>
-                </div>
-                <div id="clusterGateway" class="flex flex-wrap gap-2 text-[11px] font-mono"></div>
+        <!-- ========================================== -->
+        <!-- ABA 2: MINHAS RESERVAS                     -->
+        <!-- ========================================== -->
+        <section id="view-bookings" class="hidden space-y-6">
+            <div class="bg-charcoal-900 border border-charcoal-700 rounded-xl p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h3 class="text-[11px] text-[#8b949e] uppercase font-semibold mb-2">Nós registrados</h3>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left text-xs">
-                            <thead class="text-[10px] text-[#8b949e] uppercase border-b border-[#30363d]">
-                                <tr><th class="py-2 pr-2 font-semibold">Worker</th><th class="py-2 pr-2 font-semibold">Endpoint</th><th class="py-2 text-right font-semibold">Heartbeat</th></tr>
-                            </thead>
-                            <tbody id="clusterNodes" class="divide-y divide-[#30363d]/60 font-mono"></tbody>
-                        </table>
-                    </div>
-                    <p id="clusterNodesErr" class="hidden text-[11px] text-[#f85149] mt-2"></p>
+                    <h1 class="text-xl font-bold text-white">Minhas Reservas Confirmadas</h1>
+                    <p class="text-sm text-gray-400">Histórico de hospedagens reservadas diretamente pelo sistema HospedaSync.</p>
                 </div>
-                <div id="clusterAdmin" class="hidden space-y-3 border-t border-[#30363d] pt-4">
-                    <div id="clusterCoord" class="flex flex-wrap gap-2 text-[11px] font-mono"></div>
-                    <div>
-                        <h3 class="text-[11px] text-[#8b949e] uppercase font-semibold mb-2">Visões dos workers (quem é o líder)</h3>
-                        <div id="clusterViews" class="flex flex-wrap gap-2 text-[11px] font-mono"></div>
-                    </div>
-                    <div>
-                        <h3 class="text-[11px] text-[#8b949e] uppercase font-semibold mb-2">Locks ativos</h3>
-                        <div id="clusterLocks" class="text-xs font-mono space-y-1"></div>
-                    </div>
-                </div>
+                <button onclick="switchTab('search')" class="bg-charcoal-800 hover:bg-charcoal-700 text-gray-200 border border-charcoal-600 px-4 py-2 rounded-lg text-sm transition">
+                    <i class="fa-solid fa-plus mr-1"></i> Nova Reserva
+                </button>
             </div>
 
-            <div class="bg-[#0d1117] border border-[#30363d] p-6 rounded-xl shadow-sm space-y-4">
-                <div class="border-b border-[#30363d] pb-3">
-                    <h2 class="text-sm font-bold text-white">Varredura em lote</h2>
-                    <p class="text-xs text-[#8b949e] mt-0.5">Top 5 hotéis, check-in em +7 e +14 dias.</p>
-                </div>
-                <button id="sweepBtn" type="button" class="w-full bg-[#1f6feb] hover:bg-[#388bfd] disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg shadow transition text-xs">Disparar varredura</button>
-                <div id="sweepBox" class="hidden space-y-2">
-                    <div class="h-2 w-full bg-[#21262d] rounded-full overflow-hidden">
-                        <div id="sweepBar" class="h-full bg-[#3fb950] transition-all duration-300" style="width:0%"></div>
-                    </div>
-                    <p id="sweepText" class="text-[11px] text-[#8b949e] font-mono"></p>
-                </div>
-                <div id="sweepError" class="hidden bg-[#f85149]/10 border border-[#f85149]/30 text-[#f85149] p-3 rounded-lg text-xs"></div>
+            <div id="bookings-list" class="space-y-4">
+                <!-- Lista de reservas via JS -->
             </div>
         </section>
 
-        <!-- Audit Trail Table -->
-        <section class="bg-[#0d1117] border border-[#30363d] p-6 rounded-xl shadow-sm space-y-4">
-            <div class="flex justify-between items-center border-b border-[#30363d] pb-3">
-                <div>
-                    <h2 class="text-sm font-bold text-white">Auditoria de Tarefas Executadas</h2>
-                    <p class="text-xs text-[#8b949e]">Registro completo das requisições tratadas pelo cluster.</p>
+        <!-- ========================================== -->
+        <!-- ABA 3: COMO CHEGAR & COMÉRCIOS PRÓXIMOS    -->
+        <!-- ========================================== -->
+        <section id="view-local" class="hidden space-y-6">
+            <div class="bg-charcoal-900 border border-charcoal-700 rounded-xl p-6">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                    <div>
+                        <h1 class="text-xl font-bold text-white">Guia Local, Rotas & Arredores</h1>
+                        <p class="text-sm text-gray-400">Trace rotas até o hotel escolhido e explore comércios e serviços nas proximidades.</p>
+                    </div>
+                    <div class="w-full md:w-80">
+                        <label class="block text-xs text-gray-400 mb-1">Hotel Selecionado</label>
+                        <select id="local-hotel-select" onchange="updateLocalGuide()" class="w-full bg-charcoal-800 border border-charcoal-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none">
+                            <!-- Preenchido via JS -->
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Cartão Como Chegar -->
+                    <div class="lg:col-span-1 bg-charcoal-800 border border-charcoal-700 rounded-xl p-5 flex flex-col justify-between space-y-5">
+                        <div class="space-y-3">
+                            <div class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                                <i class="fa-solid fa-route"></i> Navegação & Rota
+                            </div>
+                            <h3 id="local-hotel-name" class="text-lg font-bold text-white">Palace Hotel Poços</h3>
+                            <p id="local-hotel-address" class="text-sm text-gray-400">Praça Pedro Sanches, s/n - Centro, Poços de Caldas - MG</p>
+                            
+                            <div class="pt-2 space-y-2 text-xs text-gray-300 border-t border-charcoal-700">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">Distância do Centro:</span>
+                                    <span id="local-dist-center" class="font-medium">0.2 km</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">Terminal Rodoviário:</span>
+                                    <span id="local-dist-terminal" class="font-medium">2.8 km (~7 min)</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">Estacionamento:</span>
+                                    <span class="font-medium text-emerald-400">Disponível no local</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-2 pt-2">
+                            <a id="btn-google-maps-dir" href="#" target="_blank" class="w-full bg-gray-200 hover:bg-white text-charcoal-950 font-semibold py-2.5 px-4 rounded-lg text-sm transition flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-diamond-turn-right"></i> Traçar Rota no Google Maps
+                            </a>
+                            <a id="btn-google-maps-place" href="#" target="_blank" class="w-full bg-charcoal-700 hover:bg-charcoal-600 text-gray-200 font-medium py-2 px-4 rounded-lg text-xs transition flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-map-pin"></i> Ver Localização Exata
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Painel de Comércios Próximos -->
+                    <div class="lg:col-span-2 bg-charcoal-800 border border-charcoal-700 rounded-xl p-5 space-y-4">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-charcoal-700 pb-3">
+                            <div>
+                                <h3 class="text-base font-bold text-white">Comércios & Serviços Próximos</h3>
+                                <p class="text-xs text-gray-400">Estabelecimentos num raio de 800m do hotel</p>
+                            </div>
+                            <div class="flex flex-wrap gap-1.5" id="poi-filters">
+                                <button onclick="filterPOI('all')" class="poi-filter-btn px-2.5 py-1 rounded text-xs bg-gray-200 text-charcoal-950 font-medium">Todos</button>
+                                <button onclick="filterPOI('Restaurante')" class="poi-filter-btn px-2.5 py-1 rounded text-xs bg-charcoal-700 text-gray-300 hover:bg-charcoal-600">Restaurantes</button>
+                                <button onclick="filterPOI('Farmácia')" class="poi-filter-btn px-2.5 py-1 rounded text-xs bg-charcoal-700 text-gray-300 hover:bg-charcoal-600">Farmácias</button>
+                                <button onclick="filterPOI('Turismo')" class="poi-filter-btn px-2.5 py-1 rounded text-xs bg-charcoal-700 text-gray-300 hover:bg-charcoal-600">Turismo</button>
+                            </div>
+                        </div>
+
+                        <div id="poi-list" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <!-- POIs renderizados via JS -->
+                        </div>
+                    </div>
                 </div>
             </div>
-            
-            <div class="overflow-x-auto">
-                <table class="w-full text-left text-xs text-[#c9d1d9]">
-                    <thead class="text-[11px] text-[#8b949e] uppercase bg-[#161b22] border-b border-[#30363d]">
-                        <tr>
-                            <th class="py-3 px-4 font-semibold">Job ID</th>
-                            <th class="py-3 px-4 font-semibold">Hotel Alvo</th>
-                            <th class="py-3 px-4 font-semibold">Tarifa Capturada</th>
-                            <th class="py-3 px-4 font-semibold">Worker Node</th>
-                            <th class="py-3 px-4 font-semibold">Latência</th>
-                            <th class="py-3 px-4 font-semibold">Horário</th>
-                        </tr>
-                    </thead>
-                    <tbody id="historyTable" class="divide-y divide-[#30363d]/60 font-mono">
-                        <tr id="emptyTableMsg">
-                            <td colspan="6" class="py-10 text-center text-[#8b949e] font-sans">
-                                Nenhum job executado nesta sessão.
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- ABA 4: MONITOR DO CLUSTER & NOMEAÇÃO       -->
+        <!-- ========================================== -->
+        <section id="view-cluster" class="hidden space-y-6">
+            <div class="bg-charcoal-900 border border-charcoal-700 rounded-xl p-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                    <div>
+                        <h1 class="text-xl font-bold text-white">Arquitetura Distribuída & Service Registry</h1>
+                        <p class="text-sm text-gray-400">Monitoramento em tempo real do esquema de nomeação dinâmica (<code class="text-gray-300">/registry/nodes</code>).</p>
+                    </div>
+                    <button onclick="fetchRegistryNodes()" class="bg-charcoal-800 hover:bg-charcoal-700 border border-charcoal-600 text-gray-200 px-4 py-2 rounded-lg text-sm transition flex items-center gap-2">
+                        <i class="fa-solid fa-arrows-rotate"></i> Atualizar Registry
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="bg-charcoal-800 border border-charcoal-700 rounded-lg p-4">
+                        <span class="text-xs text-gray-400 block">Estratégia de Nomeação</span>
+                        <span class="text-base font-bold text-white mt-1 block">Service Discovery Dinâmico</span>
+                        <span class="text-xs text-gray-500 mt-1 block">Heartbeat a cada 5s | TTL 15s</span>
+                    </div>
+                    <div class="bg-charcoal-800 border border-charcoal-700 rounded-lg p-4">
+                        <span class="text-xs text-gray-400 block">Workers Ativos no Gateway</span>
+                        <span id="cluster-node-total" class="text-2xl font-bold text-emerald-400 mt-1 block">1</span>
+                        <span class="text-xs text-gray-500 mt-1 block">Disponíveis para roteamento</span>
+                    </div>
+                    <div class="bg-charcoal-800 border border-charcoal-700 rounded-lg p-4">
+                        <span class="text-xs text-gray-400 block">Controle de Concorrência</span>
+                        <span class="text-base font-bold text-white mt-1 block">Exclusão Mútua (Redis Lock)</span>
+                        <span class="text-xs text-gray-500 mt-1 block">Evita scraping duplicado por hotel</span>
+                    </div>
+                </div>
+
+                <div class="bg-charcoal-950 border border-charcoal-700 rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-mono text-gray-400">GET /registry/nodes (Payload em Tempo Real)</span>
+                        <span id="registry-status-badge" class="text-xs px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">Conectado</span>
+                    </div>
+                    <pre id="registry-json-output" class="text-xs font-mono text-gray-300 overflow-x-auto p-2">{
+  "active_nodes": {
+    "worker-01": {
+      "endpoint": "http://worker-node:8001",
+      "last_seen": 1795389000.0
+    }
+  },
+  "count": 1
+}</pre>
+                </div>
             </div>
         </section>
+
     </main>
 
-    <!-- Footer -->
-    <footer class="border-t border-[#30363d] py-4 text-center text-xs text-[#8b949e]">
-        HospedaSync &copy; 2026 — Arquitetura Orientada a Microsserviços
-        <p class="mt-1 text-[11px] text-[#6e7681]">Fonte dos preços: Xotelo (dados TripAdvisor) · consulta em tempo real</p>
-    </footer>
+    <!-- MODAL DE RESERVA -->
+    <div id="booking-modal" class="hidden fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-charcoal-900 border border-charcoal-600 rounded-xl max-w-md w-full p-6 space-y-5 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-charcoal-700 pb-3">
+                <h3 class="text-lg font-bold text-white">Confirmar Reserva</h3>
+                <button onclick="closeBookingModal()" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
 
-    <!-- Script de Integração -->
+            <form onsubmit="confirmBooking(event)" class="space-y-4">
+                <input type="hidden" id="modal-hotel-id">
+                <div class="bg-charcoal-800 p-3 rounded-lg border border-charcoal-700">
+                    <div class="text-sm font-bold text-white" id="modal-hotel-name">Nome do Hotel</div>
+                    <div class="text-xs text-gray-400" id="modal-hotel-region">Região</div>
+                    <div class="mt-2 flex justify-between text-xs">
+                        <span class="text-gray-400">Período: <strong id="modal-dates" class="text-gray-200"></strong></span>
+                        <span class="text-gray-400">Diária: <strong id="modal-rate" class="text-emerald-400"></strong></span>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-1">Nome Completo do Hóspede</label>
+                    <input type="text" id="modal-guest-name" required placeholder="Ex: Rafael Monteiro" class="w-full bg-charcoal-800 border border-charcoal-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-gray-400">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-400 mb-1">Nº de Diárias</label>
+                        <input type="number" id="modal-nights" min="1" max="30" value="3" onchange="updateModalTotal()" class="w-full bg-charcoal-800 border border-charcoal-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-400 mb-1">Hóspedes</label>
+                        <select id="modal-guests" class="w-full bg-charcoal-800 border border-charcoal-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none">
+                            <option value="1 Adulto">1 Adulto</option>
+                            <option value="2 Adultos" selected>2 Adultos</option>
+                            <option value="2 Adultos + 1 Pet">2 Adultos + 1 Pet</option>
+                            <option value="Família (4 pessoas)">Família (4 pessoas)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between pt-2 border-t border-charcoal-700">
+                    <span class="text-sm text-gray-400">Total Estimado:</span>
+                    <span id="modal-total-price" class="text-lg font-bold text-white">R$ 0,00</span>
+                </div>
+
+                <div class="flex gap-3 pt-2">
+                    <button type="button" onclick="closeBookingModal()" class="flex-1 bg-charcoal-800 hover:bg-charcoal-700 text-gray-300 py-2.5 rounded-lg text-sm font-medium transition">Cancelar</button>
+                    <button type="submit" class="flex-1 bg-gray-200 hover:bg-white text-charcoal-950 py-2.5 rounded-lg text-sm font-semibold transition">Finalizar Reserva</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- TOAST DE NOTIFICAÇÃO -->
+    <div id="toast" class="hidden fixed bottom-5 right-5 bg-charcoal-800 border border-charcoal-600 text-white px-4 py-3 rounded-lg shadow-xl text-sm flex items-center gap-3 z-50">
+        <i class="fa-solid fa-circle-check text-emerald-400"></i>
+        <span id="toast-message">Operação concluída!</span>
+    </div>
+
     <script>
-        let historyData = [];
-
-        let selectedHotel = null;   // {hotel_key, name, ...}
-        let searchTimer = null;
-        let searchSeq = 0;
-
-        const hotelInput = document.getElementById('hotelName');
-        const sugBox = document.getElementById('hotelSuggestions');
-        const selLabel = document.getElementById('hotelSelected');
-
-        function esc(v) {
-            return String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-        }
-        function brl(n) {
-            return 'R$ ' + Number(n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        }
-        function fmtDate(iso) {
-            if (!iso) return '';
-            const d = new Date(iso);
-            return isNaN(d) ? String(iso) : d.toLocaleString('pt-BR');
-        }
-
-        // ---------- Autenticação (JWT em sessionStorage) ----------
-        const AUTH_KEY = 'hs_auth';
-        let auth = null;            // {token, exp (ms), username, role}
-        let memAuth = null;         // fallback quando sessionStorage está indisponível
-        let expiryTimer = null;
-        let pollTimer = null;
-        let sweepTimer = null;
-        let toastTimer = null;
-        let loginCountdown = null;
-
-        function loadAuth() {
-            let raw = null;
-            try { raw = sessionStorage.getItem(AUTH_KEY); } catch (_) { return memAuth; }
-            if (!raw) return memAuth;
-            try {
-                const a = JSON.parse(raw);
-                return a && typeof a.token === 'string' && Number(a.exp) > Date.now() ? a : null;
-            } catch (_) { return null; }
-        }
-        function saveAuth(a) {
-            memAuth = a;
-            try { sessionStorage.setItem(AUTH_KEY, JSON.stringify(a)); } catch (_) { /* só em memória */ }
-        }
-        function clearAuth() {
-            memAuth = null;
-            try { sessionStorage.removeItem(AUTH_KEY); } catch (_) {}
-        }
-        function authValid() { return !!auth && auth.exp > Date.now(); }
-        function isAdmin() { return !!auth && auth.role === 'admin'; }
-
-        function toast(msg) {
-            const t = document.getElementById('toast');
-            t.textContent = msg;
-            t.classList.remove('hidden');
-            clearTimeout(toastTimer);
-            toastTimer = setTimeout(() => t.classList.add('hidden'), 4000);
-        }
-
-        class AuthError extends Error {}
-
-        // Único ponto de acesso à API: injeta o token e trata 401/403.
-        async function api(path, opts = {}) {
-            const { noAuth, ...init } = opts;
-            const headers = new Headers(init.headers || {});
-            if (!noAuth) {
-                if (!authValid()) { logout('Sessão expirada. Entre novamente.'); throw new AuthError('sessão expirada'); }
-                headers.set('Authorization', 'Bearer ' + auth.token);
-            }
-            init.headers = headers;
-            const res = await fetch(path, init);
-            if (res.status === 401 && !noAuth) {
-                logout('Sessão expirada ou inválida. Entre novamente.');
-                throw new AuthError('não autorizado');
-            }
-            if (res.status === 403) toast('Sem permissão para esta ação.');
-            return res;
-        }
-
-        function stopLoops() {
-            clearTimeout(expiryTimer); expiryTimer = null;
-            clearInterval(pollTimer); pollTimer = null;
-            clearInterval(sweepTimer); sweepTimer = null;
-        }
-
-        function resetData() {
-            historyData = [];
-            selectedHotel = null;
-            hotelInput.value = '';
-            sugBox.classList.add('hidden');
-            selLabel.classList.add('hidden');
-            document.getElementById('resultPanel').classList.add('hidden');
-            document.getElementById('errorBox').classList.add('hidden');
-            document.getElementById('historyTable').innerHTML = '<tr id="emptyTableMsg"><td colspan="6" class="py-10 text-center text-[#8b949e] font-sans">Nenhum job executado nesta sessão.</td></tr>';
-            ['kpiTotal'].forEach(id => document.getElementById(id).textContent = '0');
-            document.getElementById('kpiAvg').textContent = 'R$ 0,00';
-            document.getElementById('kpiMin').textContent = 'R$ 0,00';
-            document.getElementById('kpiLatency').textContent = '0 ms';
-            updateChart();
-            document.getElementById('sweepBox').classList.add('hidden');
-            document.getElementById('sweepError').classList.add('hidden');
-            document.getElementById('sweepBtn').disabled = false;
-            document.getElementById('clusterNodes').innerHTML = '';
-            document.getElementById('clusterGateway').innerHTML = '';
-            document.getElementById('clusterStamp').textContent = '--';
-        }
-
-        function showLogin(msg) {
-            const ov = document.getElementById('loginOverlay');
-            ov.classList.remove('hidden'); ov.classList.add('flex');
-            document.getElementById('userBox').classList.add('hidden');
-            document.getElementById('userBox').classList.remove('flex');
-            document.getElementById('leaderBadge').innerHTML = 'Líder: <strong class="text-[#8b949e] font-normal">--</strong>';
-            document.getElementById('loginPass').value = '';
-            setLoginError(msg || '');
-            setTimeout(() => document.getElementById('loginUser').focus(), 0);
-        }
-        function setLoginError(msg) {
-            const box = document.getElementById('loginError');
-            box.textContent = msg || '';
-            box.classList.toggle('hidden', !msg);
-        }
-
-        function logout(msg) {
-            auth = null;
-            clearAuth();
-            stopLoops();
-            resetData();
-            showLogin(msg);
-        }
-
-        function startSession() {
-            const ov = document.getElementById('loginOverlay');
-            ov.classList.add('hidden'); ov.classList.remove('flex');
-            const ub = document.getElementById('userBox');
-            ub.classList.remove('hidden'); ub.classList.add('flex');
-            document.getElementById('userName').textContent = auth.username || '';
-            document.getElementById('userRole').textContent = auth.role || '';
-            document.getElementById('clusterAdmin').classList.toggle('hidden', !isAdmin());
-            clearTimeout(expiryTimer);
-            expiryTimer = setTimeout(() => logout('Sessão expirada. Entre novamente.'), Math.max(0, auth.exp - Date.now()));
-            loadHistory();
-            pollLeader();
-            clearInterval(pollTimer);
-            pollTimer = setInterval(pollLeader, 5000);
-        }
-
-        function parseRetryAfter(res) {
-            const n = parseInt(res.headers.get('Retry-After'), 10);
-            return Number.isFinite(n) && n > 0 ? n : 30;
-        }
-
-        function lockLogin(seconds) {
-            const btn = document.getElementById('loginBtn');
-            clearInterval(loginCountdown);
-            let left = seconds;
-            btn.disabled = true;
-            const tick = () => {
-                if (left <= 0) {
-                    clearInterval(loginCountdown);
-                    btn.disabled = false; setLoginError('');
-                    return;
-                }
-                setLoginError(`Muitas tentativas, aguarde ${left} s.`);
-                left -= 1;
-            };
-            tick();
-            loginCountdown = setInterval(tick, 1000);
-        }
-
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const btn = document.getElementById('loginBtn');
-            const username = document.getElementById('loginUser').value.trim();
-            const password = document.getElementById('loginPass').value;
-            btn.disabled = true; btn.textContent = 'Entrando...';
-            setLoginError('');
-            let locked = false;
-            try {
-                const res = await api('/auth/login', {
-                    method: 'POST', noAuth: true,
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
-                });
-                if (res.status === 429) { locked = true; lockLogin(parseRetryAfter(res)); return; }
-                if (res.status === 401) { setLoginError('Usuário ou senha inválidos.'); return; }
-                if (!res.ok) { setLoginError('Não foi possível entrar. Tente novamente em instantes.'); return; }
-                const data = await res.json();
-                const ttl = Number(data.expires_in);
-                if (!data.access_token || !(ttl > 0)) { setLoginError('Resposta de login inválida.'); return; }
-                auth = { token: data.access_token, exp: Date.now() + ttl * 1000, username, role: data.role };
-                try {
-                    const me = await api('/auth/me');
-                    if (me.ok) {
-                        const m = await me.json();
-                        if (m.username) auth.username = m.username;
-                        if (m.role) auth.role = m.role;
-                    }
-                } catch (err) { if (err instanceof AuthError) return; /* mantém dados do login */ }
-                saveAuth(auth);
-                startSession();
-            } catch (err) {
-                if (!(err instanceof AuthError)) setLoginError('Falha ao conectar ao servidor.');
-            } finally {
-                document.getElementById('loginPass').value = '';
-                if (!locked) btn.disabled = false;
-                btn.textContent = 'Entrar';
-            }
-        });
-        document.getElementById('logoutBtn').addEventListener('click', () => logout(''));
-
-        function setHotel(name) {
-            hotelInput.value = name;
-            selectedHotel = null;
-            selLabel.classList.add('hidden');
-            searchHotels(name);
-        }
-
-        function chooseHotel(h) {
-            selectedHotel = h;
-            hotelInput.value = h.name;
-            sugBox.classList.add('hidden');
-            selLabel.textContent = `Selecionado: ${h.name}`;
-            selLabel.classList.remove('hidden');
-        }
-
-        async function searchHotels(q) {
-            q = (q || '').trim();
-            if (q.length < 2) { sugBox.classList.add('hidden'); return; }
-            const seq = ++searchSeq;
-            try {
-                const res = await api(`/hotels?q=${encodeURIComponent(q)}&limit=50`);
-                if (!res.ok) throw new Error('HTTP ' + res.status);
-                const list = await res.json();
-                if (seq !== searchSeq) return;
-                sugBox.innerHTML = '';
-                if (!Array.isArray(list) || list.length === 0) {
-                    sugBox.innerHTML = '<li class="px-3.5 py-2 text-xs text-[#8b949e]">Nenhum hotel encontrado.</li>';
-                } else {
-                    list.forEach(h => {
-                        const li = document.createElement('li');
-                        li.className = 'px-3.5 py-2 cursor-pointer hover:bg-[#21262d] transition';
-                        const rating = h.rating != null ? `★ ${esc(h.rating)}` : 'sem nota';
-                        const reviews = h.review_count != null ? ` · ${Number(h.review_count).toLocaleString('pt-BR')} avaliações` : '';
-                        li.innerHTML = `<div class="text-xs text-white">${esc(h.name)}</div><div class="text-[11px] text-[#8b949e]">${rating}${reviews}</div>`;
-                        li.addEventListener('mousedown', ev => { ev.preventDefault(); chooseHotel(h); });
-                        sugBox.appendChild(li);
-                    });
-                }
-                sugBox.classList.remove('hidden');
-            } catch (err) {
-                if (err instanceof AuthError) return;
-                if (seq !== searchSeq) return;
-                sugBox.innerHTML = '<li class="px-3.5 py-2 text-xs text-[#f85149]">Falha ao buscar hotéis.</li>';
-                sugBox.classList.remove('hidden');
-            }
-        }
-
-        hotelInput.addEventListener('input', () => {
-            selectedHotel = null;
-            selLabel.classList.add('hidden');
-            clearTimeout(searchTimer);
-            searchTimer = setTimeout(() => searchHotels(hotelInput.value), 300);
-        });
-        hotelInput.addEventListener('blur', () => setTimeout(() => sugBox.classList.add('hidden'), 150));
-
-        function showResult(data) {
-            const r = data.result;
-            const badge = document.getElementById('resultBadge');
-            if (r.source === 'live' && !r.stale) {
-                badge.innerHTML = '<span class="text-[10px] bg-[#238636]/15 text-[#3fb950] border border-[#238636]/30 font-mono px-2 py-0.5 rounded">AO VIVO</span>';
-            } else {
-                badge.innerHTML = `<span class="text-[10px] bg-[#9e6a03]/15 text-[#d29922] border border-[#9e6a03]/30 font-mono px-2 py-0.5 rounded">CACHE · dado de ${esc(fmtDate(r.fetched_at))}</span>`;
-            }
-            document.getElementById('resultHotel').textContent = r.hotel_name || '';
-            document.getElementById('persistWarn').classList.toggle('hidden', data.persisted !== false);
-            const rates = (r.rates || []).slice().sort((a, b) => a.rate - b.rate);
-            const min = rates.length ? rates[0].rate : r.min_rate;
-            document.getElementById('ratesBody').innerHTML = rates.map(x => {
-                const best = x.rate === min;
-                return `<tr><td class="py-2 pr-2 ${best ? 'text-[#3fb950] font-semibold' : 'text-[#c9d1d9]'}">${esc(x.name || x.code)}</td>` +
-                       `<td class="py-2 text-right font-mono ${best ? 'text-[#3fb950] font-semibold bg-[#238636]/10' : 'text-[#c9d1d9]'}">${brl(x.rate)}</td></tr>`;
-            }).join('');
-            const link = document.getElementById('resultLink');
-            if (r.tripadvisor_url && /^https?:\/\//i.test(String(r.tripadvisor_url))) { link.href = r.tripadvisor_url; link.classList.remove('hidden'); }
-            else link.classList.add('hidden');
-            document.getElementById('resultPanel').classList.remove('hidden');
-        }
-
-        function toItem(r, worker, time) {
-            return {
-                job_id: r.job_id,
-                hotel: r.hotel_name || r.hotel_key,
-                price: Number(r.daily_rate ?? r.min_rate),
-                worker: worker,
-                latency: Number(r.processing_time_ms) || 0,
-                source: r.source,
-                time: time
-            };
-        }
-
-        async function loadHistory() {
-            try {
-                const res = await api('/history');
-                if (!res.ok) return;
-                const list = await res.json();
-                if (!Array.isArray(list)) return;
-                list.slice().reverse().forEach(r => {
-                    if (r.daily_rate == null && r.min_rate == null) return;
-                    const t = r.fetched_at ? new Date(r.fetched_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '--';
-                    historyData.push(toItem(r, r.processed_by || r.worker || '-', t));
-                    updateTable();
-                });
-                updateKPIs();
-                updateChart();
-            } catch (err) { /* histórico indisponível */ }
-        }
-
-        // Configuração do Gráfico Chart.js
-        const ctx = document.getElementById('rateChart').getContext('2d');
-        const rateChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: [],
-                datasets: [{
-                    label: 'Tarifa (BRL)',
-                    data: [],
-                    borderColor: '#58a6ff',
-                    backgroundColor: 'rgba(88, 166, 255, 0.1)',
-                    borderWidth: 2,
-                    fill: true,
-                    tension: 0.25,
-                    pointRadius: 4,
-                    pointHoverRadius: 6,
-                    pointBackgroundColor: '#79c0ff'
-                }]
+        // BASE DE DADOS SIMULADA (MOCK DATA RICO PARA DEMONSTRAÇÃO DO FRONT)
+        let hotelsData = [
+            {
+                id: "h1",
+                name: "Palace Hotel Poços de Caldas",
+                region: "Poços de Caldas - MG",
+                address: "Praça Pedro Sanches, s/n - Centro, Poços de Caldas - MG",
+                rate: 480.00,
+                rating: 4.8,
+                worker: "worker-01",
+                distCenter: "0.1 km",
+                distTerminal: "2.8 km (~7 min)",
+                tags: ["Histórico", "Águas Termais", "Café Incluso"],
+                pois: [
+                    { name: "Thermas Antônio Carlos", category: "Turismo", dist: "120m" },
+                    { name: "Restaurante Sa Rosa", category: "Restaurante", dist: "250m" },
+                    { name: "Drogasil Centro", category: "Farmácia", dist: "180m" },
+                    { name: "Parque José Affonso Junqueira", category: "Turismo", dist: "90m" }
+                ]
             },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    x: { grid: { color: 'rgba(240,246,252,0.05)' }, ticks: { color: '#8b949e', font: { size: 10 } } },
-                    y: { grid: { color: 'rgba(240,246,252,0.05)' }, ticks: { color: '#8b949e', font: { size: 10 } }, beginAtZero: false }
-                },
-                plugins: { legend: { display: false } }
+            {
+                id: "h2",
+                name: "Hotel Minas Gerais",
+                region: "Poços de Caldas - MG",
+                address: "Rua Pernambuco, 615 - Centro, Poços de Caldas - MG",
+                rate: 345.00,
+                rating: 4.5,
+                worker: "worker-01",
+                distCenter: "0.4 km",
+                distTerminal: "2.5 km (~6 min)",
+                tags: ["Piscina Aquecida", "Estacionamento", "Pet Friendly"],
+                pois: [
+                    { name: "Cantina do Araújo", category: "Restaurante", dist: "300m" },
+                    { name: "Droga Raia", category: "Farmácia", dist: "210m" },
+                    { name: "Relógio Floral", category: "Turismo", dist: "450m" },
+                    { name: "Café Concerto", category: "Restaurante", dist: "350m" }
+                ]
+            },
+            {
+                id: "h3",
+                name: "Hotel Vilage Inn All Inclusive",
+                region: "Poços de Caldas - MG",
+                address: "Av. Vereador Edmundo Cardillo, 3500 - Poços de Caldas - MG",
+                rate: 790.00,
+                rating: 4.7,
+                worker: "worker-02",
+                distCenter: "4.2 km",
+                distTerminal: "3.9 km (~8 min)",
+                tags: ["All Inclusive", "Parque Aquático", "Lazer"],
+                pois: [
+                    { name: "Shopping Poços de Caldas", category: "Turismo", dist: "600m" },
+                    { name: "Churrascaria Tropeiro", category: "Restaurante", dist: "750m" },
+                    { name: "Farmácia Pague Menos", category: "Farmácia", dist: "650m" }
+                ]
+            },
+            {
+                id: "h4",
+                name: "Bourbon Cataratas do Iguaçu",
+                region: "Foz do Iguaçu - PR",
+                address: "Av. das Cataratas, Km 2.5 - Foz do Iguaçu - PR",
+                rate: 680.00,
+                rating: 4.9,
+                worker: "worker-01",
+                distCenter: "3.5 km",
+                distTerminal: "6.0 km (~11 min)",
+                tags: ["Resort", "Natureza", "Spa"],
+                pois: [
+                    { name: "Catuaí Palladium Shopping", category: "Turismo", dist: "800m" },
+                    { name: "Rafain Churrascaria Show", category: "Restaurante", dist: "950m" },
+                    { name: "Farmácia Nissei", category: "Farmácia", dist: "700m" }
+                ]
+            },
+            {
+                id: "h5",
+                name: "Hotel Transamerica Executive Paulista",
+                region: "São Paulo - SP",
+                address: "Alameda Lorena, 473 - Jardim Paulista, São Paulo - SP",
+                rate: 560.00,
+                rating: 4.6,
+                worker: "worker-02",
+                distCenter: "3.1 km",
+                distTerminal: "9.5 km (~22 min)",
+                tags: ["Executivo", "Metrô Próximo", "Wi-Fi Alta Velocidade"],
+                pois: [
+                    { name: "MASP - Museu de Arte", category: "Turismo", dist: "850m" },
+                    { name: "Bacio di Latte Jardins", category: "Restaurante", dist: "300m" },
+                    { name: "Drogaria São Paulo", category: "Farmácia", dist: "150m" }
+                ]
+            },
+            {
+                id: "h6",
+                name: "Hotel Laghetto Stilo Borges",
+                region: "Gramado - RS",
+                address: "Rua Senador Salgado Filho, 181 - Centro, Gramado - RS",
+                rate: 820.00,
+                rating: 4.9,
+                worker: "worker-01",
+                distCenter: "0.2 km",
+                distTerminal: "1.1 km (~3 min)",
+                tags: ["Lareira", "Centro", "Café Colonial"],
+                pois: [
+                    { name: "Rua Coberta", category: "Turismo", dist: "200m" },
+                    { name: "Casa da Velha Bruxa", category: "Restaurante", dist: "220m" },
+                    { name: "Farmácia São João", category: "Farmácia", dist: "140m" }
+                ]
             }
-        });
+        ];
 
-        // Handler do Formulário
-        document.getElementById('dispatchForm').addEventListener('submit', async (e) => {
+        let bookings = JSON.parse(localStorage.getItem('hospedasync_bookings') || '[]');
+        let currentPOIFilter = 'all';
+        let activeModalHotel = null;
+
+        // NAVEGAÇÃO ENTRE ABAS
+        function switchTab(tabName) {
+            ['search', 'bookings', 'local', 'cluster'].forEach(t => {
+                document.getElementById(`view-${t}`).classList.add('hidden');
+                const navBtn = document.getElementById(`nav-${t}`);
+                if (navBtn) navBtn.classList.remove('tab-active', 'text-white');
+            });
+
+            document.getElementById(`view-${tabName}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`nav-${tabName}`);
+            if (activeBtn) activeBtn.classList.add('tab-active');
+
+            if (tabName === 'bookings') renderBookings();
+            if (tabName === 'local') updateLocalGuide();
+            if (tabName === 'cluster') fetchRegistryNodes();
+        }
+
+        // RENDERIZAR HOTÉIS
+        function renderHotels() {
+            const region = document.getElementById('search-region').value;
+            const sort = document.getElementById('search-sort').value;
+            const grid = document.getElementById('hotels-grid');
+
+            let filtered = hotelsData.filter(h => region === 'all' || h.region === region);
+
+            if (sort === 'price_asc') filtered.sort((a, b) => a.rate - b.rate);
+            if (sort === 'price_desc') filtered.sort((a, b) => b.rate - a.rate);
+            if (sort === 'rating') filtered.sort((a, b) => b.rating - a.rating);
+
+            document.getElementById('hotels-count').textContent = filtered.length;
+
+            grid.innerHTML = filtered.map(hotel => `
+                <div class="bg-charcoal-900 border border-charcoal-700 hover:border-charcoal-500 rounded-xl p-5 flex flex-col justify-between transition shadow-md">
+                    <div class="space-y-3">
+                        <div class="flex items-start justify-between gap-2">
+                            <span class="text-[11px] font-medium px-2.5 py-0.5 rounded bg-charcoal-800 text-gray-300 border border-charcoal-700">
+                                <i class="fa-solid fa-location-dot mr-1 text-gray-400"></i>${hotel.region}
+                            </span>
+                            <span class="text-xs font-semibold text-amber-400 flex items-center gap-1">
+                                <i class="fa-solid fa-star"></i> ${hotel.rating.toFixed(1)}
+                            </span>
+                        </div>
+
+                        <div>
+                            <h3 class="text-base font-bold text-white leading-snug">${hotel.name}</h3>
+                            <p class="text-xs text-gray-400 mt-1 line-clamp-1">${hotel.address}</p>
+                        </div>
+
+                        <div class="flex flex-wrap gap-1.5 pt-1">
+                            ${hotel.tags.map(tag => `<span class="text-[11px] bg-charcoal-800 text-gray-400 px-2 py-0.5 rounded">${tag}</span>`).join('')}
+                        </div>
+                    </div>
+
+                    <div class="mt-5 pt-4 border-t border-charcoal-800 space-y-3">
+                        <div class="flex items-end justify-between">
+                            <div>
+                                <span class="text-[11px] text-gray-500 block">Coletado por <code class="text-gray-400">${hotel.worker}</code></span>
+                                <span class="text-xl font-bold text-white">R$ ${hotel.rate.toFixed(2).replace('.', ',')}</span>
+                                <span class="text-xs text-gray-400">/noite</span>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <button onclick="openBookingModal('${hotel.id}')" class="col-span-2 bg-gray-200 hover:bg-white text-charcoal-950 font-semibold py-2 px-3 rounded-lg text-xs transition flex items-center justify-center gap-1.5">
+                                <i class="fa-solid fa-calendar-check"></i> Reservar Agora
+                            </button>
+                            <button onclick="goToLocalGuide('${hotel.id}')" class="bg-charcoal-800 hover:bg-charcoal-700 text-gray-300 border border-charcoal-600 py-2 px-2 rounded-lg text-xs transition flex items-center justify-center gap-1">
+                                <i class="fa-solid fa-route"></i> Como Chegar
+                            </button>
+                            <button onclick="goToLocalGuide('${hotel.id}')" class="bg-charcoal-800 hover:bg-charcoal-700 text-gray-300 border border-charcoal-600 py-2 px-2 rounded-lg text-xs transition flex items-center justify-center gap-1">
+                                <i class="fa-solid fa-store"></i> Arredores (${hotel.pois.length})
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // SIMULAR SINCRONIZAÇÃO / DISPATCH NO BACKEND
+        async function handleSearch(e) {
             e.preventDefault();
-            
-            const btn = document.getElementById('submitBtn');
-            const errBox = document.getElementById('errorBox');
-            
-            btn.disabled = true;
-            btn.innerHTML = `<span class="animate-pulse">Despachando ordem...</span>`;
-            errBox.classList.add('hidden');
+            const region = document.getElementById('search-region').value;
+            const statusBar = document.getElementById('scrape-status');
+            const statusText = document.getElementById('scrape-status-text');
 
-            if (!selectedHotel) {
-                errBox.innerText = 'Selecione um hotel da lista de sugestões antes de disparar.';
-                errBox.classList.remove('hidden');
-                btn.disabled = false;
-                btn.innerHTML = `<span>Disparar Varredura Distribuída</span>`;
-                return;
-            }
+            statusBar.classList.remove('hidden');
+            statusText.textContent = `Consultando nós ativos para atualizar tarifas em ${region === 'all' ? 'todas as regiões' : region}...`;
 
-            const payload = {
-                hotel_key: selectedHotel.hotel_key,
-                checkin_date: document.getElementById('checkin').value,
-                checkout_date: document.getElementById('checkout').value,
-                currency: 'BRL'
-            };
-
+            // Tenta bater na API real se estiver online
             try {
-                const res = await api('/jobs/dispatch', {
+                const sampleHotel = hotelsData.find(h => region === 'all' || h.region === region) || hotelsData[0];
+                await fetch('/jobs/dispatch', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify({
+                        hotel_name: sampleHotel.name,
+                        checkin_date: document.getElementById('search-checkin').value,
+                        checkout_date: document.getElementById('search-checkout').value
+                    })
                 });
-
-                let data = {};
-                try { data = await res.json(); } catch (_) {}
-
-                if (!res.ok) {
-                    const msgs = {
-                        403: 'Sem permissão para esta ação.',
-                        409: 'Este hotel já está sendo processado. Aguarde a conclusão e tente novamente.',
-                        404: 'Nenhuma oferta encontrada para este hotel nas datas escolhidas.',
-                        503: 'Serviço de preços temporariamente indisponível. Tente novamente em instantes.'
-                    };
-                    const detail = typeof data.detail === 'string' ? data.detail : '';
-                    throw new Error(msgs[res.status] || detail || 'Falha ao conectar ao cluster');
-                }
-
-                showResult(data);
-                const item = toItem(data.result, data.dispatched_to,
-                    new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-
-                historyData.push(item);
-
-                updateKPIs();
-                updateChart();
-                updateTable();
-
-            } catch (err) {
-                if (!(err instanceof AuthError)) {
-                    errBox.textContent = err.message;
-                    errBox.classList.remove('hidden');
-                }
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = `<span>Disparar Varredura Distribuída</span>`;
+            } catch (_) {
+                // Fallback silencioso caso esteja rodando apenas como arquivo estático
             }
-        });
 
-        function updateKPIs() {
-            if (historyData.length === 0) return;
-
-            const prices = historyData.map(d => d.price);
-            const latencies = historyData.map(d => d.latency);
-
-            const total = historyData.length;
-            const avg = prices.reduce((a, b) => a + b, 0) / total;
-            const min = Math.min(...prices);
-            const avgLat = latencies.reduce((a, b) => a + b, 0) / total;
-
-            document.getElementById('kpiTotal').innerText = total;
-            document.getElementById('kpiAvg').innerText = brl(avg);
-            document.getElementById('kpiMin').innerText = brl(min);
-            document.getElementById('kpiLatency').innerText = `${avgLat.toFixed(1)} ms`;
+            setTimeout(() => {
+                // Pequena variação de preço para simular atualização dinâmica do scraper
+                hotelsData.forEach(h => {
+                    if (region === 'all' || h.region === region) {
+                        const delta = (Math.random() * 20 - 10);
+                        h.rate = Math.max(190, Math.round((h.rate + delta) * 100) / 100);
+                    }
+                });
+                renderHotels();
+                statusBar.classList.add('hidden');
+                showToast(`Tarifas sincronizadas para ${region === 'all' ? 'todas as regiões' : region}!`);
+            }, 800);
         }
 
-        function updateChart() {
-            rateChart.data.labels = historyData.map(d => d.time);
-            rateChart.data.datasets[0].data = historyData.map(d => d.price);
-            rateChart.update();
+        // MODAL DE RESERVA
+        function openBookingModal(hotelId) {
+            activeModalHotel = hotelsData.find(h => h.id === hotelId);
+            if (!activeModalHotel) return;
+
+            const checkin = document.getElementById('search-checkin').value;
+            const checkout = document.getElementById('search-checkout').value;
+
+            document.getElementById('modal-hotel-id').value = activeModalHotel.id;
+            document.getElementById('modal-hotel-name').textContent = activeModalHotel.name;
+            document.getElementById('modal-hotel-region').textContent = activeModalHotel.region;
+            document.getElementById('modal-dates').textContent = `${checkin} até ${checkout}`;
+            document.getElementById('modal-rate').textContent = `R$ ${activeModalHotel.rate.toFixed(2).replace('.', ',')}`;
+
+            updateModalTotal();
+            document.getElementById('booking-modal').classList.remove('hidden');
         }
 
-        function updateTable() {
-            const tbody = document.getElementById('historyTable');
-            
-            const emptyMsg = document.getElementById('emptyTableMsg');
-            if (emptyMsg) emptyMsg.remove();
-
-            const latest = historyData[historyData.length - 1];
-
-            const row = document.createElement('tr');
-            row.className = "hover:bg-[#21262d]/50 transition";
-            row.innerHTML = `
-                <td class="py-3 px-4 text-[#58a6ff] font-medium">${esc(latest.job_id)}</td>
-                <td class="py-3 px-4 font-sans text-white">${esc(latest.hotel)}${latest.source ? ` <span class="ml-1 text-[10px] font-mono ${latest.source === 'live' ? 'text-[#3fb950]' : 'text-[#d29922]'}">${latest.source === 'live' ? 'AO VIVO' : 'CACHE'}</span>` : ''}</td>
-                <td class="py-3 px-4 text-[#3fb950] font-semibold">${brl(latest.price)}</td>
-                <td class="py-3 px-4 text-[#8b949e]">${esc(latest.worker)}</td>
-                <td class="py-3 px-4 text-[#d29922]">${esc(latest.latency)} ms</td>
-                <td class="py-3 px-4 text-[#6e7681]">${esc(latest.time)}</td>
-            `;
-
-            tbody.insertBefore(row, tbody.firstChild);
+        function closeBookingModal() {
+            document.getElementById('booking-modal').classList.add('hidden');
         }
 
-        // ---------- Saúde do Cluster (polling a cada 5 s) ----------
-        let clusterBusy = false;
-
-        function chip(label, value, ok) {
-            const color = ok === true ? 'text-[#3fb950] border-[#238636]/40 bg-[#238636]/10'
-                        : ok === false ? 'text-[#f85149] border-[#f85149]/40 bg-[#f85149]/10'
-                        : 'text-[#c9d1d9] border-[#30363d] bg-[#21262d]';
-            return `<span class="border ${color} px-2 py-0.5 rounded">${esc(label)}: ${esc(value)}</span>`;
-        }
-        function leaderName(id) {
-            return 'worker-' + String(id).padStart(2, '0');
-        }
-        function setLeaderBadge(html) {
-            document.getElementById('leaderBadge').innerHTML = 'Líder: ' + html;
-        }
-        async function getJson(path) {
-            const res = await api(path);
-            if (!res.ok) throw new Error('HTTP ' + res.status);
-            return res.json();
+        function updateModalTotal() {
+            if (!activeModalHotel) return;
+            const nights = parseInt(document.getElementById('modal-nights').value) || 1;
+            const total = activeModalHotel.rate * nights;
+            document.getElementById('modal-total-price').textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
         }
 
-        function renderGateway(h) {
-            const el = document.getElementById('clusterGateway');
-            if (!h) { el.innerHTML = chip('Gateway', 'indisponível', false); return; }
-            el.innerHTML = chip('Gateway', h.status, h.status === 'UP') +
-                chip('Redis', h.redis_lock_connection, h.redis_lock_connection === 'UP') +
-                chip('RabbitMQ', h.rabbitmq, h.rabbitmq === 'UP') +
-                chip('Workers', h.registered_workers, null);
+        function confirmBooking(e) {
+            e.preventDefault();
+            const nights = parseInt(document.getElementById('modal-nights').value) || 1;
+            const newBooking = {
+                code: 'RES-' + Math.random().toString(36).substring(2, 7).toUpperCase(),
+                hotelId: activeModalHotel.id,
+                hotelName: activeModalHotel.name,
+                region: activeModalHotel.region,
+                guestName: document.getElementById('modal-guest-name').value,
+                guests: document.getElementById('modal-guests').value,
+                checkin: document.getElementById('search-checkin').value,
+                checkout: document.getElementById('search-checkout').value,
+                nights: nights,
+                total: activeModalHotel.rate * nights,
+                createdAt: new Date().toLocaleString('pt-BR')
+            };
+
+            bookings.unshift(newBooking);
+            localStorage.setItem('hospedasync_bookings', JSON.stringify(bookings));
+            updateBookingBadge();
+            closeBookingModal();
+            showToast(`Reserva ${newBooking.code} confirmada com sucesso!`);
         }
 
-        function renderNodes(data, errMsg) {
-            const body = document.getElementById('clusterNodes');
-            const err = document.getElementById('clusterNodesErr');
-            err.classList.toggle('hidden', !errMsg);
-            err.textContent = errMsg || '';
-            if (errMsg) return;
-            const nodes = (data && data.active_nodes) || {};
-            const ids = Object.keys(nodes).sort();
-            if (!ids.length) {
-                body.innerHTML = '<tr><td colspan="3" class="py-4 text-center text-[#8b949e] font-sans">Nenhum nó registrado.</td></tr>';
+        function updateBookingBadge() {
+            document.getElementById('badge-bookings').textContent = bookings.length;
+        }
+
+        function renderBookings() {
+            const container = document.getElementById('bookings-list');
+            if (bookings.length === 0) {
+                container.innerHTML = `
+                    <div class="bg-charcoal-900 border border-charcoal-700 rounded-xl p-10 text-center space-y-3">
+                        <i class="fa-solid fa-suitcase-rolling text-3xl text-gray-600"></i>
+                        <p class="text-gray-400 text-sm">Você ainda não possui reservas registradas no sistema.</p>
+                        <button onclick="switchTab('search')" class="bg-gray-200 text-charcoal-950 font-semibold px-4 py-2 rounded-lg text-xs">Explorar Hotéis</button>
+                    </div>
+                `;
                 return;
             }
-            const nowS = Date.now() / 1000;
-            body.innerHTML = ids.map(id => {
-                const n = nodes[id] || {};
-                const age = Math.max(0, Math.round(nowS - Number(n.last_seen)));
-                const ageTxt = Number.isFinite(age) ? `há ${age} s` : '--';
-                const stale = Number.isFinite(age) && age > 10;
-                return `<tr><td class="py-2 pr-2 text-white">${esc(id)}</td>` +
-                       `<td class="py-2 pr-2 text-[#8b949e]">${esc(n.endpoint)}</td>` +
-                       `<td class="py-2 text-right ${stale ? 'text-[#d29922]' : 'text-[#3fb950]'}">${esc(ageTxt)}</td></tr>`;
+
+            container.innerHTML = bookings.map((b, idx) => `
+                <div class="bg-charcoal-900 border border-charcoal-700 rounded-xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div class="space-y-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">${b.code}</span>
+                            <span class="text-xs text-gray-400">${b.region}</span>
+                        </div>
+                        <h3 class="text-base font-bold text-white">${b.hotelName}</h3>
+                        <p class="text-xs text-gray-400">Hóspede: <strong class="text-gray-200">${b.guestName}</strong> (${b.guests}) • ${b.nights} diária(s) (${b.checkin} a ${b.checkout})</p>
+                    </div>
+                    <div class="flex items-center gap-4 justify-between md:justify-end border-t md:border-t-0 border-charcoal-800 pt-3 md:pt-0">
+                        <div class="text-right">
+                            <span class="text-xs text-gray-400 block">Valor Total</span>
+                            <span class="text-lg font-bold text-white">R$ ${b.total.toFixed(2).replace('.', ',')}</span>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="goToLocalGuide('${b.hotelId}')" class="bg-charcoal-800 hover:bg-charcoal-700 border border-charcoal-600 text-gray-200 px-3 py-2 rounded-lg text-xs" title="Como chegar">
+                                <i class="fa-solid fa-route"></i> Rota
+                            </button>
+                            <button onclick="cancelBooking(${idx})" class="bg-charcoal-800 hover:bg-red-950 border border-charcoal-600 hover:border-red-800 text-gray-400 hover:text-red-400 px-3 py-2 rounded-lg text-xs" title="Cancelar Reserva">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function cancelBooking(index) {
+            bookings.splice(index, 1);
+            localStorage.setItem('hospedasync_bookings', JSON.stringify(bookings));
+            updateBookingBadge();
+            renderBookings();
+            showToast('Reserva cancelada.');
+        }
+
+        // GUIA LOCAL, ROTAS & COMÉRCIOS PRÓXIMOS
+        function populateLocalSelect() {
+            const select = document.getElementById('local-hotel-select');
+            select.innerHTML = hotelsData.map(h => `<option value="${h.id}">${h.name} (${h.region})</option>`).join('');
+        }
+
+        function goToLocalGuide(hotelId) {
+            document.getElementById('local-hotel-select').value = hotelId;
+            switchTab('local');
+        }
+
+        function filterPOI(category) {
+            currentPOIFilter = category;
+            document.querySelectorAll('.poi-filter-btn').forEach(btn => {
+                btn.classList.remove('bg-gray-200', 'text-charcoal-950', 'font-medium');
+                btn.classList.add('bg-charcoal-700', 'text-gray-300');
+            });
+            event.target.classList.remove('bg-charcoal-700', 'text-gray-300');
+            event.target.classList.add('bg-gray-200', 'text-charcoal-950', 'font-medium');
+            updateLocalGuide();
+        }
+
+        function updateLocalGuide() {
+            const hotelId = document.getElementById('local-hotel-select').value || hotelsData[0].id;
+            const hotel = hotelsData.find(h => h.id === hotelId) || hotelsData[0];
+
+            document.getElementById('local-hotel-name').textContent = hotel.name;
+            document.getElementById('local-hotel-address').textContent = hotel.address;
+            document.getElementById('local-dist-center').textContent = hotel.distCenter;
+            document.getElementById('local-dist-terminal').textContent = hotel.distTerminal;
+
+            const encodedDest = encodeURIComponent(`${hotel.name}, ${hotel.address}`);
+            document.getElementById('btn-google-maps-dir').href = `https://www.google.com/maps/dir/?api=1&destination=${encodedDest}`;
+            document.getElementById('btn-google-maps-place').href = `https://www.google.com/maps/search/?api=1&query=${encodedDest}`;
+
+            const poiList = document.getElementById('poi-list');
+            const filteredPOIs = hotel.pois.filter(p => currentPOIFilter === 'all' || p.category === currentPOIFilter);
+
+            poiList.innerHTML = filteredPOIs.map(poi => {
+                const icon = poi.category === 'Restaurante' ? 'fa-utensils' : (poi.category === 'Farmácia' ? 'fa-pills' : 'fa-camera');
+                const mapsSearch = encodeURIComponent(`${poi.name} perto de ${hotel.name} ${hotel.region}`);
+                return `
+                    <a href="https://www.google.com/maps/search/?api=1&query=${mapsSearch}" target="_blank" class="bg-charcoal-900 border border-charcoal-700 hover:border-charcoal-500 rounded-lg p-3.5 flex items-center justify-between transition group">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-lg bg-charcoal-800 flex items-center justify-center text-gray-400 group-hover:text-white">
+                                <i class="fa-solid ${icon} text-xs"></i>
+                            </div>
+                            <div>
+                                <div class="text-sm font-medium text-gray-200 group-hover:text-white">${poi.name}</div>
+                                <div class="text-[11px] text-gray-500">${poi.category} • a ${poi.dist}</div>
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-arrow-up-right-from-square text-xs text-gray-600 group-hover:text-gray-300"></i>
+                    </a>
+                `;
             }).join('');
         }
 
-        function renderCoordination(c) {
-            const coord = document.getElementById('clusterCoord');
-            const views = document.getElementById('clusterViews');
-            const locks = document.getElementById('clusterLocks');
-            if (!c) {
-                coord.innerHTML = chip('Coordenação', 'indisponível', false);
-                views.innerHTML = ''; locks.innerHTML = '';
-                return;
-            }
-            coord.innerHTML = chip('Líder', c.leader_id != null ? leaderName(c.leader_id) : 'sem líder', c.leader_id != null) +
-                chip('Consenso', c.consensus ? 'sim' : 'não', !!c.consensus);
-            const v = c.worker_views || {};
-            const vk = Object.keys(v).sort();
-            views.innerHTML = vk.length
-                ? vk.map(k => chip(k, v[k] === 'unreachable' ? 'inacessível' : (v[k] == null ? '?' : leaderName(v[k])), v[k] === 'unreachable' ? false : null)).join('')
-                : '<span class="text-[#8b949e] font-sans">Nenhum worker respondeu.</span>';
-            if (c.active_locks == null) {
-                locks.innerHTML = '<span class="text-[#d29922] font-sans">Locks indisponíveis (Redis).</span>';
-            } else if (!c.active_locks.length) {
-                locks.innerHTML = '<span class="text-[#8b949e] font-sans">Nenhum lock ativo.</span>';
-            } else {
-                locks.innerHTML = c.active_locks.map(l =>
-                    `<div class="flex justify-between gap-3 bg-[#21262d] border border-[#30363d] rounded px-2 py-1"><span class="text-white">${esc(l.resource)}</span><span class="text-[#8b949e]">${esc(l.owner)} · TTL ${esc(l.ttl_seconds)} s</span></div>`).join('');
-            }
-        }
-
-        async function pollLeader() {
-            if (clusterBusy || !authValid()) return;
-            clusterBusy = true;
+        // INTEGRAÇÃO REAL COM SERVICE REGISTRY (/registry/nodes)
+        async function fetchRegistryNodes() {
             try {
-                const admin = isAdmin();
-                const [h, n, c] = await Promise.allSettled([
-                    getJson('/health'),
-                    getJson('/registry/nodes'),
-                    admin ? getJson('/coordination/status') : Promise.resolve(null)
-                ]);
-                if (!authValid()) return;   // sessão encerrada durante a requisição
-                renderGateway(h.status === 'fulfilled' ? h.value : null);
-                renderNodes(n.status === 'fulfilled' ? n.value : null, n.status === 'fulfilled' ? '' : 'Falha ao consultar os nós registrados.');
-                if (admin) {
-                    renderCoordination(c.status === 'fulfilled' ? c.value : null);
-                    if (c.status === 'fulfilled' && c.value && c.value.leader_id != null) {
-                        setLeaderBadge(`<strong class="text-[#3fb950] font-normal">${esc(leaderName(c.value.leader_id))}</strong>`);
-                    } else if (c.status === 'fulfilled') {
-                        setLeaderBadge('<strong class="text-[#d29922] font-normal">sem consenso</strong>');
-                    } else {
-                        setLeaderBadge('<strong class="text-[#f85149] font-normal">indisponível</strong>');
-                    }
-                } else {
-                    setLeaderBadge('<strong class="text-[#8b949e] font-normal">restrito</strong>');
+                const res = await fetch('/registry/nodes');
+                if (res.ok) {
+                    const data = await res.json();
+                    document.getElementById('registry-json-output').textContent = JSON.stringify(data, null, 2);
+                    document.getElementById('cluster-node-total').textContent = data.count;
+                    document.getElementById('registry-count').textContent = `${data.count} ${data.count === 1 ? 'Nó Ativo' : 'Nós Ativos'}`;
+                    document.getElementById('registry-status-badge').textContent = 'Online (API Real)';
                 }
-                document.getElementById('clusterStamp').textContent = new Date().toLocaleTimeString('pt-BR');
-            } catch (err) {
-                /* AuthError: logout já tratado; demais erros ficam nos painéis */
-            } finally {
-                clusterBusy = false;
+            } catch (e) {
+                document.getElementById('registry-status-badge').textContent = 'Modo Preview (Mock)';
             }
         }
 
-        // ---------- Varredura em lote ----------
-        function sweepError(msg) {
-            const box = document.getElementById('sweepError');
-            box.textContent = msg || '';
-            box.classList.toggle('hidden', !msg);
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-message').textContent = msg;
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 3200);
         }
 
-        function renderSweep(s) {
-            const total = Number(s.total) || 0;
-            const done = (Number(s.done) || 0) + (Number(s.errors) || 0) + (Number(s.no_rates) || 0);
-            const pct = total ? Math.min(100, Math.round(done / total * 100)) : 100;
-            document.getElementById('sweepBar').style.width = pct + '%';
-            document.getElementById('sweepText').textContent =
-                `${done}/${total} (${pct}%) · ok ${s.done || 0} · erros ${s.errors || 0} · sem tarifa ${s.no_rates || 0}` +
-                (s.finished ? ' · concluída' : '');
-        }
-
-        document.getElementById('sweepBtn').addEventListener('click', async () => {
-            const btn = document.getElementById('sweepBtn');
-            btn.disabled = true;
-            sweepError('');
-            clearInterval(sweepTimer);
-            try {
-                const res = await api('/sweeps', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ top_n: 5, date_offsets: [7, 14] })
-                });
-                let data = {};
-                try { data = await res.json(); } catch (_) {}
-                if (!res.ok) {
-                    const detail = typeof data.detail === 'string' ? data.detail : '';
-                    const msgs = { 403: 'Sem permissão para esta ação.', 503: 'Serviço de varredura indisponível. Tente novamente em instantes.' };
-                    sweepError(msgs[res.status] || detail || 'Falha ao disparar a varredura.');
-                    btn.disabled = false;
-                    return;
-                }
-                const id = data.sweep_id;
-                document.getElementById('sweepBox').classList.remove('hidden');
-                renderSweep({ total: data.jobs_enqueued, done: 0, errors: 0, no_rates: 0 });
-                let failures = 0, busy = false;
-                sweepTimer = setInterval(async () => {
-                    if (busy) return;
-                    busy = true;
-                    try {
-                        const r = await api(`/sweeps/${encodeURIComponent(id)}`);
-                        if (!r.ok) throw new Error('HTTP ' + r.status);
-                        const s = await r.json();
-                        failures = 0;
-                        renderSweep(s);
-                        if (s.finished) { clearInterval(sweepTimer); btn.disabled = false; }
-                    } catch (err) {
-                        if (err instanceof AuthError) return;
-                        if (++failures >= 5) {
-                            clearInterval(sweepTimer); btn.disabled = false;
-                            sweepError('Não foi possível acompanhar o progresso da varredura.');
-                        }
-                    } finally { busy = false; }
-                }, 1500);
-            } catch (err) {
-                if (!(err instanceof AuthError)) sweepError('Falha ao conectar ao servidor.');
-                btn.disabled = false;
-            }
-        });
-
-        // ---------- Inicialização ----------
-        auth = loadAuth();
-        if (authValid()) startSession();
-        else { auth = null; clearAuth(); showLogin(''); }
+        // INICIALIZAÇÃO
+        populateLocalSelect();
+        renderHotels();
+        updateBookingBadge();
+        fetchRegistryNodes();
+        setInterval(fetchRegistryNodes, 10000);
     </script>
 </body>
 </html>
